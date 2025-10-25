@@ -1,0 +1,5 @@
+{
+  "name": "PharmKo",
+  "description": "A comprehensive pharmacovigilance application that analyzes drug safety data and generates AI-powered legal risk assessments. It aggregates data from various sources to identify potential wrongdoing, regulatory violations, and legal causes of action.",
+  "requestFramePermissions": []
+}
