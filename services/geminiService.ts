@@ -225,6 +225,47 @@ export const analyzeDrugSafety = async (
   
   const jsonText = response.text.trim();
   const analysisResult: AnalysisResult = JSON.parse(jsonText);
-  
-  return { analysisResult, sourceData };
-};
+  import type { AnalysisResult, SourceData } from '../types';
+
+  // New implementation: delegate AI analysis to the backend OpenAI-powered endpoint.
+  // The backend will perform API fetching (RxNorm, FDA, ClinicalTrials, PubMed, Europe PMC)
+  // and call OpenAI. This client-side function keeps the same contract and
+  // simply relays logs via updateLog.
+
+  export const analyzeDrugSafety = async (
+    drugName: string,
+    updateLog: (message: string) => void
+  ): Promise<{ analysisResult: AnalysisResult; sourceData: SourceData }> => {
+    updateLog(`Sending analysis request for "${drugName}" to backend...`);
+
+    try {
+      const resp = await fetch(`/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ drugName }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`Backend analysis failed: ${resp.status} ${resp.statusText} - ${text}`);
+      }
+
+      // The backend returns { analysisResult, sourceData, logs? }
+      const body = await resp.json();
+
+      // If backend provides progress log entries, append them
+      if (Array.isArray(body.logs)) {
+        body.logs.forEach((l: string) => updateLog(l));
+      } else {
+        updateLog('✓ Analysis complete (backend).');
+      }
+
+      return { analysisResult: body.analysisResult, sourceData: body.sourceData };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      updateLog(`Analysis error: ${message}`);
+      throw err;
+    }
+  };

@@ -1,1 +1,10 @@
-full contents of backend/requirements.txt
+Flask
+flask-cors
+gunicorn
+requests
+python-dotenv
+google-cloud-storage
+google-cloud-secret-manager
+cloud-sql-python-connector[pg8000]
+openai==0.28.1
+
