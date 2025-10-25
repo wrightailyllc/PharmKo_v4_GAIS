@@ -27,17 +27,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          npm install --legacy-peer-deps
+          npm install -g typescript
+
+      - name: Type Check
+        run: npm run typecheck
 
       - name: Build
         run: npm run build
         env:
-          BACKEND_URL: 'https://pharmapp-285590939607.us-east1.run.app'
-          FDA_API_KEY: 'M7xeeL25vsNApgZJYSzWBIvySDypNxNQC1EBivAp'
-          PUBMED_EMAIL: 'wrightai.lyllc@gmail.com'
+          VITE_BACKEND_URL: 'https://pharmapp-285590939607.us-east1.run.app'
+          VITE_FDA_API_KEY: 'M7xeeL25vsNApgZJYSzWBIvySDypNxNQC1EBivAp'
+          VITE_PUBMED_EMAIL: 'wrightai.lyllc@gmail.com'
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
