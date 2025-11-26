@@ -32,8 +32,8 @@ steps:
 
 # Define the substitution variables that must be mapped in the Cloud Build Trigger
 substitutions:
-  _API_KEY: 'required_api_key' # Must be set in Trigger settings
-  _FDA_API_KEY: ''
+  _API_KEY: 'AIzaSyDR66Q9STwsIkySXKcRvqLLlX2irCt2GWg' # Must be set in Trigger settings
+  _FDA_API_KEY: 'M7xeeL25vsNApgZJYSzWBIvySDypNxNQC1EBivAp'
 
 options:
   logging: CLOUD_LOGGING_ONLY
