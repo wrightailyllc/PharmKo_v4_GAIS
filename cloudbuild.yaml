@@ -30,12 +30,11 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
 
-# Define the substitution variables that need to be matched in the Trigger settings
+# Define the substitution variables that must be mapped in the Cloud Build Trigger
 substitutions:
-  _API_KEY: 'required_api_key'
-  _FDA_API_KEY: '' # Optional, defaults to empty if not provided
+  _API_KEY: 'required_api_key' # Must be set in Trigger settings
+  _FDA_API_KEY: ''
 
-# Fix for "service_account" error: explicitly set logging to Cloud Logging
 options:
   logging: CLOUD_LOGGING_ONLY
 
