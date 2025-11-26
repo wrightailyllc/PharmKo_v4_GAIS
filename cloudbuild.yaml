@@ -1,0 +1,39 @@
+steps:
+  # Build the container image with secrets passed as build-args
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'API_KEY=$_API_KEY'
+      - '--build-arg'
+      - 'FDA_API_KEY=$_FDA_API_KEY'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/pharmko-app:$COMMIT_SHA'
+      - '.'
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/pharmko-app:$COMMIT_SHA']
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pharmko-app'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/pharmko-app:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+# Define the substitution variables that need to be matched in the Trigger settings
+substitutions:
+  _API_KEY: 'required_api_key'
+  _FDA_API_KEY: '' # Optional, defaults to empty if not provided
+
+images:
+  - 'gcr.io/$PROJECT_ID/pharmko-app:$COMMIT_SHA'
