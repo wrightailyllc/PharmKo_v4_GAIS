@@ -35,5 +35,9 @@ substitutions:
   _API_KEY: 'required_api_key'
   _FDA_API_KEY: '' # Optional, defaults to empty if not provided
 
+# Fix for "service_account" error: explicitly set logging to Cloud Logging
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 images:
   - 'gcr.io/$PROJECT_ID/pharmko-app:$COMMIT_SHA'
