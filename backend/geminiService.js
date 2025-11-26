@@ -1,13 +1,11 @@
-// backend/geminiService.js
+// backend/geminiService.js (ES module)
 
-const OpenAI = require("openai");
+import OpenAI from "openai";
 
-// Uses the OPENAI_API_KEY env var (set in Cloud Run from Secret Manager)
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// FDA key from env
 const fdaApiKey = process.env.FDA_API_KEY;
 
 // ---------- Helper for fetch ----------
@@ -17,7 +15,7 @@ async function fetchApi(url, errorMessage) {
     const response = await fetch(url);
     if (!response.ok) {
       if (response.status === 404) {
-        return null; // Gracefully handle "Not Found" as no data
+        return null;
       }
       throw new Error(`${errorMessage}: ${response.status} ${response.statusText}`);
     }
@@ -140,12 +138,14 @@ async function fetchEuropePmcData(activeIngredient) {
   return { data, url };
 }
 
-// ---------- Main analysis function (server-side) ----------
+// ---------- Main analysis function ----------
 
-async function analyzeDrugSafety(drugName, updateLog) {
+export async function analyzeDrugSafety(drugName, updateLog) {
   updateLog(`Identifying drug: ${drugName}...`);
 
-  const { rxcui, activeIngredient, urls: rxNormUrls } = await fetchRxNormData(drugName);
+  const { rxcui, activeIngredient, urls: rxNormUrls } = await fetchRxNormData(
+    drugName
+  );
   const sourceData = { rxcui, activeIngredient };
 
   updateLog(`Fetching data for ${activeIngredient} (RxCUI: ${rxcui})...`);
@@ -216,7 +216,6 @@ RAW DATA:
 - Journal Article Abstracts for Analysis: ${articleAnalysisPrompt.substring(0, 8000)}
 `;
 
-  // JSON schema for OpenAI Responses API
   const analysisResultSchema = {
     type: "object",
     properties: {
@@ -356,5 +355,3 @@ RAW DATA:
 
   return { analysisResult, sourceData };
 }
-
-module.exports = { analyzeDrugSafety };
