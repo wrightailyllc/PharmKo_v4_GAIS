@@ -2,22 +2,12 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import type { AnalysisResult, SourceData } from '../types';
-import { localApiKeys } from '../config';
 
-// Use local keys if provided, otherwise fallback to environment variables
-const geminiApiKey = (localApiKeys.GEMINI_API_KEY && localApiKeys.GEMINI_API_KEY !== 'PASTE_YOUR_GEMINI_API_KEY_HERE')
-  ? localApiKeys.GEMINI_API_KEY
-  : process.env.API_KEY as string;
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+// Assume this variable is pre-configured, valid, and accessible.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const fdaApiKey = localApiKeys.FDA_API_KEY || process.env.FDA_API_KEY;
-
-if (!geminiApiKey) {
-  // This will show up as an error on the dashboard page if the analysis fails.
-  throw new Error("Gemini API key is missing. Please add it to config.ts or ensure it's in your environment variables.");
-}
-
-const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-
+const fdaApiKey = process.env.FDA_API_KEY;
 
 // --- Helper Functions ---
 
