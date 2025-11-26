@@ -5,9 +5,9 @@ import type { AnalysisResult, SourceData } from '../types';
 
 // The API key must be obtained exclusively from the environment variable process.env.API_KEY.
 // Assume this variable is pre-configured, valid, and accessible.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: 'AIzaSyDR66Q9STwsIkySXKcRvqLLlX2irCt2GWg' });
 
-const fdaApiKey = process.env.FDA_API_KEY;
+const fdaApiKey = 'M7xeeL25vsNApgZJYSzWBIvySDypNxNQC1EBivAp';
 
 // --- Helper Functions ---
 
