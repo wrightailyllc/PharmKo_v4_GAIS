@@ -1,10 +1,17 @@
-const path = require("path");
-const express = require("express");
-const { analyzeDrugSafety } = require("./backend/geminiService");
+// server.js (ES module)
+
+import path from "path";
+import express from "express";
+import { fileURLToPath } from "url";
+import { analyzeDrugSafety } from "./backend/geminiService.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
 
+// Serve static Vite build
 const distPath = path.join(__dirname, "dist");
 app.use(express.static(distPath));
 
