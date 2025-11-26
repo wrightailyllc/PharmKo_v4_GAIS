@@ -1,3 +1,6 @@
+// services/geminiService.ts (frontend)
+// This runs in the browser and ONLY talks to the backend API.
+
 import type { AnalysisResult, SourceData } from "../types";
 
 interface BackendResponse {
@@ -24,7 +27,7 @@ export const analyzeDrugSafety = async (
   }
 
   const body: BackendResponse = await res.json();
-  body.logs?.forEach((m) => updateLog(m));
+  body.logs?.forEach((msg) => updateLog(msg));
 
   return {
     analysisResult: body.analysisResult,
