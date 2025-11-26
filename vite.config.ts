@@ -14,8 +14,6 @@ export default defineConfig(({ mode }) => {
       // Prioritize process.env (set by Docker) over .env files, or fallback to .env
       'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY),
       'process.env.FDA_API_KEY': JSON.stringify(process.env.FDA_API_KEY || env.FDA_API_KEY),
-      // Prevent crash if accessing other process.env properties
-      'process.env': JSON.stringify({}),
     },
   };
 });
