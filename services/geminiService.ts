@@ -1,7 +1,23 @@
+// services/geminiService.ts
+
 import { GoogleGenAI, Type } from "@google/genai";
 import type { AnalysisResult, SourceData } from '../types';
+import { localApiKeys } from '../config';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+// Use local keys if provided, otherwise fallback to environment variables
+const geminiApiKey = (localApiKeys.GEMINI_API_KEY && localApiKeys.GEMINI_API_KEY !== 'PASTE_YOUR_GEMINI_API_KEY_HERE')
+  ? localApiKeys.GEMINI_API_KEY
+  : process.env.API_KEY as string;
+
+const fdaApiKey = localApiKeys.FDA_API_KEY || process.env.FDA_API_KEY;
+
+if (!geminiApiKey) {
+  // This will show up as an error on the dashboard page if the analysis fails.
+  throw new Error("Gemini API key is missing. Please add it to config.ts or ensure it's in your environment variables.");
+}
+
+const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+
 
 // --- Helper Functions ---
 
@@ -23,8 +39,8 @@ const fetchApi = async (url: string, errorMessage: string) => {
 // --- API Fetching Functions ---
 
 const fetchRxNormData = async (drugName: string) => {
-  const url = `https://rxnav.nlm.nih.gov/REST/rxcui.json?name=${encodeURIComponent(drugName)}&search=2`;
-  const data = await fetchApi(url, 'RxNorm API request failed');
+  const rxcuiUrl = `https://rxnav.nlm.nih.gov/REST/rxcui.json?name=${encodeURIComponent(drugName)}&search=2`;
+  const data = await fetchApi(rxcuiUrl, 'RxNorm API request failed');
   const rxcui = data?.idGroup?.rxnormId?.[0];
   if (!rxcui) throw new Error(`Could not find a valid RxCUI for "${drugName}".`);
   
@@ -32,41 +48,72 @@ const fetchRxNormData = async (drugName: string) => {
   const ingredientData = await fetchApi(ingredientUrl, 'RxNorm ingredient lookup failed');
   const activeIngredient = ingredientData?.relatedGroup?.conceptGroup?.[0]?.conceptProperties?.[0]?.name || drugName;
   
-  return { rxcui, activeIngredient };
+  return { 
+    rxcui, 
+    activeIngredient, 
+    urls: {
+      rxNormRxcui: rxcuiUrl,
+      rxNormIngredient: ingredientUrl,
+    }
+  };
 };
 
-const fetchFdaData = async (activeIngredient: string) => {
-  const fdaApiKey = process.env.FDA_API_KEY;
-  let labelUrl = `https://api.fda.gov/drug/label.json?search=openfda.substance_name:"${encodeURIComponent(activeIngredient)}"&limit=1`;
-  let eventsUrl = `https://api.fda.gov/drug/event.json?search=patient.drug.openfda.substance_name:"${encodeURIComponent(activeIngredient)}"&count=patient.reaction.reactionmeddrapt.exact&limit=50`;
+const fetchFdaData = async (drugName: string, activeIngredient: string) => {
+  const fdaApiBase = 'https://api.fda.gov/drug';
+  const addApiKey = (url: string) => fdaApiKey ? `${url}&api_key=${fdaApiKey}` : url;
 
-  if (fdaApiKey) {
-    labelUrl += `&api_key=${fdaApiKey}`;
-    eventsUrl += `&api_key=${fdaApiKey}`;
-  }
-  
-  const [fdaLabel, adverseEvents] = await Promise.all([
+  // Build a more robust query that searches brand name, generic name, and substance name.
+  // This is more likely to find results if one of the fields doesn't match perfectly.
+  const labelSearchQuery = `(openfda.brand_name:"${encodeURIComponent(drugName)}" OR openfda.generic_name:"${encodeURIComponent(drugName)}" OR openfda.substance_name:"${encodeURIComponent(activeIngredient)}")`;
+  const eventSearchQuery = `(patient.drug.openfda.brand_name:"${encodeURIComponent(drugName)}" OR patient.drug.openfda.generic_name:"${encodeURIComponent(drugName)}" OR patient.drug.openfda.substance_name:"${encodeURIComponent(activeIngredient)}")`;
+
+  const labelUrl = addApiKey(`${fdaApiBase}/label.json?search=${labelSearchQuery}&limit=1`);
+  const totalEventsUrl = addApiKey(`${fdaApiBase}/event.json?search=${eventSearchQuery}&count=safetyreportid.exact&limit=0`);
+  const topReactionsUrl = addApiKey(`${fdaApiBase}/event.json?search=${eventSearchQuery}&count=patient.reaction.reactionmeddrapt.exact&limit=50`);
+
+  const [fdaLabel, adverseEventsTotal, adverseEventsReactions] = await Promise.all([
     fetchApi(labelUrl, 'FDA Label API returned an error'),
-    fetchApi(eventsUrl, 'FDA Adverse Events API returned an error'),
+    fetchApi(totalEventsUrl, 'FDA Adverse Events (Total) API returned an error'),
+    fetchApi(topReactionsUrl, 'FDA Adverse Events (Reactions) API returned an error'),
   ]);
 
-  return { fdaLabel, adverseEvents };
+  const combinedAdverseEvents = {
+    meta: {
+      results: { total: adverseEventsTotal?.meta?.results?.total || 0 }
+    },
+    results: adverseEventsReactions?.results || [],
+  };
+
+  return { 
+    fdaLabel, 
+    adverseEvents: combinedAdverseEvents,
+    urls: {
+      fdaLabel: labelUrl,
+      fdaAdverseEventsTotal: totalEventsUrl,
+      fdaAdverseEventsReactions: topReactionsUrl,
+    }
+  };
 };
 
 const fetchClinicalTrialsData = async (activeIngredient: string) => {
   const url = `https://clinicaltrials.gov/api/v2/studies?query.term=${encodeURIComponent(activeIngredient)}&pageSize=50`;
-  return await fetchApi(url, 'ClinicalTrials.gov API request failed');
-};
-
-const fetchPubmedData = async (activeIngredient: string) => {
-  const email = process.env.PUBMED_EMAIL || 'info@example.com';
-  const url = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=(${encodeURIComponent(activeIngredient)})+AND+(safety+OR+adverse+OR+risk)&retmax=200&sort=relevance&retmode=json&email=${email}`;
-  return await fetchApi(url, 'PubMed API request failed');
+  const data = await fetchApi(url, 'ClinicalTrials.gov API request failed');
+  return { data, url };
 };
 
 const fetchEuropePmcData = async (activeIngredient: string) => {
-  const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(${encodeURIComponent(activeIngredient)}) AND (SAFETY OR ADVERSE OR RISK)&resultType=lite&pageSize=200&format=json`;
-  return await fetchApi(url, 'Europe PMC API request failed');
+    const safetyQuery = `(${encodeURIComponent(activeIngredient)}) AND (SAFETY OR ADVERSE OR RISK)`;
+    let url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${safetyQuery}&resultType=core&pageSize=10&format=json`;
+    let data = await fetchApi(url, 'Europe PMC API request failed');
+
+    if (!data || data.hitCount === 0) {
+        const broadQuery = `(${encodeURIComponent(activeIngredient)})`;
+        const broadUrl = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${broadQuery}&resultType=core&pageSize=10&format=json`;
+        data = await fetchApi(broadUrl, 'Europe PMC API request failed');
+        url = broadUrl; // Update url to the one that was successful
+    }
+
+    return { data, url };
 };
 
 
@@ -78,27 +125,43 @@ export const analyzeDrugSafety = async (
 ): Promise<{ analysisResult: AnalysisResult; sourceData: SourceData }> => {
   
   updateLog(`Identifying drug: ${drugName}...`);
-  const { rxcui, activeIngredient } = await fetchRxNormData(drugName);
+  const { rxcui, activeIngredient, urls: rxNormUrls } = await fetchRxNormData(drugName);
   const sourceData: SourceData = { rxcui, activeIngredient };
 
   updateLog(`Fetching data for ${activeIngredient} (RxCUI: ${rxcui})...`);
   const [
-      { fdaLabel, adverseEvents },
-      clinicalTrials,
-      pubmedData,
-      europePmcData,
+      { fdaLabel, adverseEvents, urls: fdaUrls },
+      { data: clinicalTrials, url: clinicalTrialsUrl },
+      { data: europePmcData, url: europePmcUrl },
   ] = await Promise.all([
-      fetchFdaData(activeIngredient).then(data => { updateLog('✓ FDA data retrieved.'); return data; }),
+      fetchFdaData(drugName, activeIngredient).then(data => { updateLog('✓ FDA data retrieved.'); return data; }),
       fetchClinicalTrialsData(activeIngredient).then(data => { updateLog('✓ ClinicalTrials.gov data retrieved.'); return data; }),
-      fetchPubmedData(activeIngredient).then(data => { updateLog('✓ PubMed articles retrieved.'); return data; }),
       fetchEuropePmcData(activeIngredient).then(data => { updateLog('✓ Europe PMC articles retrieved.'); return data; }),
   ]);
 
   sourceData.fdaLabel = fdaLabel;
   sourceData.adverseEvents = adverseEvents;
   sourceData.clinicalTrials = clinicalTrials;
-  sourceData.pubmedArticles = pubmedData;
   sourceData.europePmcArticles = europePmcData;
+  sourceData.apiUrls = {
+    ...rxNormUrls,
+    ...fdaUrls,
+    clinicalTrials: clinicalTrialsUrl,
+    europePmc: europePmcUrl,
+  };
+
+  const articleAbstracts = europePmcData?.resultList?.result
+    ?.map((article: any) => article.abstractText)
+    .filter(Boolean)
+    .join('\n\n---\n\n');
+  
+  const articleAnalysisPrompt = articleAbstracts
+    ? `Analyze the following abstracts from recent, relevant journal articles:\n${articleAbstracts}`
+    : `No relevant journal articles with abstracts were found for detailed analysis. Note the potential implications of a lack of recent, specific safety literature in your summary.`;
+  
+  // Note: The PubMed call was removed for simplicity and to rely on EuropePMC which mirrors PubMed content.
+  // We'll synthesize a count for the prompt to avoid major prompt changes.
+  const totalArticleCount = europePmcData?.hitCount || 0;
 
   updateLog('Synthesizing data with AI...');
   const prompt = `
@@ -107,7 +170,7 @@ export const analyzeDrugSafety = async (
       - Drug Label Analysis: Summarize the drug's use. Explicitly state the black box warning if present. Identify other common drug names that use this active ingredient.
       - Clinical Trial Analysis: Summarize the findings. State the highest trial phase found (e.g., Phase 3, Phase 4) and list the primary medical conditions studied.
       - Adverse Effects Profile: Summarize the overall profile. Include the total number of adverse events found. Create pie chart data by calculating the percentage of each of the top adverse events. Group any event representing less than 5% of the total into a single "Other" category, UNLESS it is a serious event (e.g., involves death, disability), in which case it should be listed individually. Also, provide a separate simple list of the top 5 most frequent event terms.
-      - Journal Article Analysis: Summarize the literature. Provide key findings. State the total number of articles reviewed and how many might be behind a paywall (assume any not providing a full abstract could be).
+      - Journal Article Analysis: Base your summary on the provided article abstracts. Provide key findings from these specific articles. If no abstracts were provided, comment on the implications of that. State the total number of articles found across all databases and estimate how many might be behind a paywall (assume any not providing a full abstract could be).
       - Drug Interactions: Summarize potential interactions based on the label data. List specific substances, their effects, and a severity level (e.g., High, Moderate, Low).
       - Potential Harm Score: Provide a brief summary and a numerical score from 1 (low) to 10 (high) representing the potential for harm based on all available data (warnings, AEs, etc.).
       - Citations: Provide two example citations for the most critical data points (e.g., the FDA label source, a key clinical trial).
@@ -115,9 +178,10 @@ export const analyzeDrugSafety = async (
 
       RAW DATA:
       - FDA Label: ${JSON.stringify(fdaLabel?.results?.[0]).substring(0, 4000)}
-      - Adverse Events (FAERS): Total Reports: ${adverseEvents?.meta?.results?.total}. Top results: ${JSON.stringify(adverseEvents?.results).substring(0, 4000)}
+      - Adverse Events (FAERS): Total Reports: ${adverseEvents.meta.results.total}. Top results: ${JSON.stringify(adverseEvents.results).substring(0, 4000)}
       - Clinical Trials: ${JSON.stringify(clinicalTrials?.studies?.slice(0, 10)).substring(0, 4000)}
-      - PubMed/EuropePMC Article Count: ${(pubmedData?.esearchresult?.count || 0) + (europePmcData?.hitCount || 0)}
+      - Total PubMed/EuropePMC Article Count: ${totalArticleCount}
+      - Journal Article Abstracts for Analysis: ${articleAnalysisPrompt.substring(0, 8000)}
   `;
 
   const analysisResultSchema = {
@@ -225,47 +289,6 @@ export const analyzeDrugSafety = async (
   
   const jsonText = response.text.trim();
   const analysisResult: AnalysisResult = JSON.parse(jsonText);
-  import type { AnalysisResult, SourceData } from '../types';
-
-  // New implementation: delegate AI analysis to the backend OpenAI-powered endpoint.
-  // The backend will perform API fetching (RxNorm, FDA, ClinicalTrials, PubMed, Europe PMC)
-  // and call OpenAI. This client-side function keeps the same contract and
-  // simply relays logs via updateLog.
-
-  export const analyzeDrugSafety = async (
-    drugName: string,
-    updateLog: (message: string) => void
-  ): Promise<{ analysisResult: AnalysisResult; sourceData: SourceData }> => {
-    updateLog(`Sending analysis request for "${drugName}" to backend...`);
-
-    try {
-      const resp = await fetch(`/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ drugName }),
-      });
-
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(`Backend analysis failed: ${resp.status} ${resp.statusText} - ${text}`);
-      }
-
-      // The backend returns { analysisResult, sourceData, logs? }
-      const body = await resp.json();
-
-      // If backend provides progress log entries, append them
-      if (Array.isArray(body.logs)) {
-        body.logs.forEach((l: string) => updateLog(l));
-      } else {
-        updateLog('✓ Analysis complete (backend).');
-      }
-
-      return { analysisResult: body.analysisResult, sourceData: body.sourceData };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      updateLog(`Analysis error: ${message}`);
-      throw err;
-    }
-  };
+  
+  return { analysisResult, sourceData };
+};

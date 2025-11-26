@@ -69,6 +69,6 @@ export interface SourceData {
   fdaLabel?: any;
   adverseEvents?: any;
   clinicalTrials?: any;
-  pubmedArticles?: any;
   europePmcArticles?: any;
+  apiUrls?: Record<string, string>;
 }
