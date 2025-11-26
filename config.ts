@@ -19,10 +19,10 @@ export const localApiKeys = {
   /**
    * Your Google AI API key for Gemini.
    */
-  GEMINI_API_KEY: 'AIzaSyDR66Q9STwsIkySXKcRvqLLlX2irCt2GWg',
+  GEMINI_API_KEY: 'AIzaSyBnjfYgAn7Bn1h0Nvx8sa3OaWRuL3fFBrg',
 
   /**
    * Your openFDA API key.
    */
-  FDA_API_KEY: '', // e.g., 'M7xeeL25vsNApgZJYSzWBIvySDypNxNQC1EBivAp'
+  FDA_API_KEY: 'M7xeeL25vsNApgZJYSzWBIvySDypNxNQC1EBivAp'
 };
