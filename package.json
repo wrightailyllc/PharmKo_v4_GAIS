@@ -27,5 +27,10 @@
   "scripts": {
   "build": "vite build",
   "start": "node server.js"
+},
+  "dependencies": {
+  "express": "^4.21.0",
+  "openai": "^4.0.0",
+  ...
 }
 }
