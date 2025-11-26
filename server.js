@@ -1,16 +1,13 @@
-// server.js
 const path = require("path");
 const express = require("express");
-const { analyzeDrugSafety } = require("./backend/geminiService"); // you'll create this next
+const { analyzeDrugSafety } = require("./backend/geminiService");
 
 const app = express();
 app.use(express.json());
 
-// Serve the built frontend
 const distPath = path.join(__dirname, "dist");
 app.use(express.static(distPath));
 
-// API endpoint that the frontend will call
 app.post("/api/analyze", async (req, res) => {
   const { drugName } = req.body;
 
@@ -29,7 +26,6 @@ app.post("/api/analyze", async (req, res) => {
       drugName,
       updateLog
     );
-
     res.json({ analysisResult, sourceData, logs });
   } catch (err) {
     console.error("Error in /api/analyze:", err);
@@ -40,7 +36,6 @@ app.post("/api/analyze", async (req, res) => {
   }
 });
 
-// Cloud Run requirement: listen on PORT env
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
