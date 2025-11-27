@@ -9,7 +9,7 @@
 const secretsCache: { [key: string]: string } = {};
 
 declare const __VITE_BACKEND_URL__: string;
-const BACKEND_URL = typeof __VITE_BACKEND_URL__ !== 'undefined' ? __VITE_BACKEND_URL__ : "http://localhost:5000";
+const BACKEND_URL = typeof __VITE_BACKEND_URL__ !== 'undefined' ? __VITE_BACKEND_URL__ : "";
 
 async function fetchSecret(secretName: string): Promise<string> {
   // Return from cache if available
