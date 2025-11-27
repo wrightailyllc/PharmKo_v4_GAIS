@@ -381,9 +381,9 @@ export const analyzeDrugSafety = async (
       - All text MUST be formatted as Markdown.
 
       RAW DATA:
-      - FDA Label: ${JSON.stringify(fdaLabel?.results?.[0]).substring(0, 4000)}
-      - Adverse Events (FAERS): Total Reports: ${adverseEvents.meta.results.total}. Top results: ${JSON.stringify(adverseEvents.results).substring(0, 4000)}
-      - Clinical Trials: ${JSON.stringify(clinicalTrials?.studies?.slice(0, 10)).substring(0, 4000)}
+      - FDA Label: ${JSON.stringify(fdaLabel?.results?.[0]).substring(0, 10000)}
+      - Adverse Events (FAERS): Total Reports: ${adverseEvents.meta.results.total}. Top results: ${JSON.stringify(adverseEvents.results).substring(0, 10000)}
+      - Clinical Trials: ${JSON.stringify(clinicalTrials?.studies?.slice(0, 10)).substring(0, 10000)}
       - Total PubMed/EuropePMC Article Count: ${totalArticleCount}
       - Journal Article Abstracts for Analysis: ${articleAnalysisPrompt.substring(0, 8000)}
   `;
