@@ -3,7 +3,8 @@ Flask backend for PharmKo - handles API secrets securely via Google Cloud Secret
 """
 import os
 import logging
-from flask import Flask, jsonify, request
+from pathlib import Path
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from google.cloud import secretmanager
 
@@ -11,7 +12,7 @@ from google.cloud import secretmanager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)
 CORS(app)
 
 # Cache for secrets to avoid repeated API calls
@@ -20,20 +21,12 @@ _secrets_cache = {}
 def get_secret(secret_name: str, project_id: str = None) -> str:
     """
     Retrieve a secret from Google Cloud Secret Manager.
-    
-    Args:
-        secret_name: Name of the secret (e.g., 'gemini-api-key')
-        project_id: GCP project ID (defaults to environment variable)
-    
-    Returns:
-        The secret value as a string
     """
     if not project_id:
         project_id = os.environ.get("GCP_PROJECT_ID")
         if not project_id:
             raise ValueError("GCP_PROJECT_ID environment variable not set")
     
-    # Check cache first
     cache_key = f"{project_id}/{secret_name}"
     if cache_key in _secrets_cache:
         return _secrets_cache[cache_key]
@@ -43,8 +36,6 @@ def get_secret(secret_name: str, project_id: str = None) -> str:
         secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
         response = client.access_secret_version(request={"name": secret_path})
         secret_value = response.payload.data.decode("UTF-8")
-        
-        # Cache the secret
         _secrets_cache[cache_key] = secret_value
         logger.info(f"Retrieved secret: {secret_name}")
         return secret_value
@@ -53,6 +44,7 @@ def get_secret(secret_name: str, project_id: str = None) -> str:
         raise
 
 
+# API Routes
 @app.route("/api/health", methods=["GET"])
 def health_check():
     """Health check endpoint"""
@@ -61,10 +53,7 @@ def health_check():
 
 @app.route("/api/secrets/gemini-key", methods=["GET"])
 def get_gemini_key():
-    """
-    Endpoint for frontend to get Gemini API key.
-    Frontend will make a request to this endpoint instead of storing the key directly.
-    """
+    """Get Gemini API key from Secret Manager"""
     try:
         api_key = get_secret("gemini-api-key")
         return jsonify({"api_key": api_key}), 200
@@ -75,9 +64,7 @@ def get_gemini_key():
 
 @app.route("/api/secrets/fda-key", methods=["GET"])
 def get_fda_key():
-    """
-    Endpoint for frontend to get FDA API key.
-    """
+    """Get FDA API key from Secret Manager"""
     try:
         api_key = get_secret("fda-api-key")
         return jsonify({"api_key": api_key}), 200
@@ -88,15 +75,10 @@ def get_fda_key():
 
 @app.route("/api/config", methods=["GET"])
 def get_config():
-    """
-    Endpoint that provides safe, non-sensitive configuration to the frontend.
-    Returns whether secrets are available and the backend is ready.
-    """
+    """Check if backend is properly configured"""
     try:
-        # Test that we can retrieve secrets
         get_secret("gemini-api-key")
         get_secret("fda-api-key")
-        
         return jsonify({
             "ready": True,
             "message": "Backend is configured and secrets are accessible"
@@ -109,42 +91,51 @@ def get_config():
         }), 500
 
 
-@app.route("/", methods=["GET"])
-@app.route("/<path:filename>", methods=["GET"])
-def serve_static(filename="index.html"):
-    """
-    Serve static React app files.
-    For any request that's not an /api/ endpoint, serve the React app.
-    This enables client-side routing to work properly.
-    """
-    try:
-        # Map request to static file
-        static_dir = os.path.join(os.path.dirname(__file__), "..", "dist")
-        
-        # If requesting root or any path, try to serve the file, fallback to index.html
-        if filename and not filename.startswith("api/"):
-            file_path = os.path.join(static_dir, filename)
-            # Security: prevent directory traversal
-            if os.path.abspath(file_path).startswith(os.path.abspath(static_dir)):
-                if os.path.exists(file_path) and os.path.isfile(file_path):
-                    return app.send_static_file(filename)
-        
-        # Default to index.html for client-side routing
-        return app.send_static_file("index.html")
-    except Exception as e:
-        logger.error(f"Error serving static file: {str(e)}")
+# Static file serving - serve React app
+def get_dist_path():
+    """Get absolute path to dist folder"""
+    app_dir = Path(__file__).parent
+    dist_path = (app_dir.parent / "dist").resolve()
+    return dist_path
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_react_app(path):
+    """Serve React app and handle client-side routing"""
+    # Skip API routes
+    if path.startswith("api/"):
         return jsonify({"error": "Not found"}), 404
+    
+    dist_path = get_dist_path()
+    
+    # Try to serve the requested file
+    if path:
+        file_path = dist_path / path
+        # Security: prevent directory traversal
+        try:
+            if file_path.resolve().is_relative_to(dist_path) and file_path.is_file():
+                return send_file(str(file_path))
+        except (ValueError, Exception):
+            pass
+    
+    # Default to index.html for client-side routing
+    index_file = dist_path / "index.html"
+    if index_file.exists():
+        return send_file(str(index_file))
+    
+    logger.error(f"index.html not found at {index_file}")
+    return jsonify({"error": "Application not found"}), 404
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    dist_path = get_dist_path()
     
-    # Set static folder for Flask
-    static_dir = os.path.join(os.path.dirname(__file__), "..", "dist")
-    app.static_folder = static_dir
-    app.static_url_path = "/"
+    if dist_path.exists():
+        logger.info(f"Serving static files from: {dist_path}")
+    else:
+        logger.warning(f"Static directory not found at: {dist_path}")
     
-    logger.info(f"Serving static files from: {static_dir}")
     logger.info(f"Starting Flask app on port {port}")
-    
     app.run(host="0.0.0.0", port=port, debug=False)

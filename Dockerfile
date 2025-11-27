@@ -28,8 +28,6 @@ COPY --from=build /app/dist /app/static
 # Copy the Python backend
 COPY backend/main.py ./
 
-# Copy Nginx configuration for serving the static site
-COPY nginx.conf ./
 
 # Expose port 8080 (for Cloud Run)
 EXPOSE 8080
