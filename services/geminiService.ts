@@ -283,7 +283,7 @@ export const analyzeDrugSafety = async (
 
   updateLog('✓ AI analysis complete.');
   
-  const jsonText = response.text.trim();
+  const jsonText = (response.text || '').trim();
   const analysisResult: AnalysisResult = JSON.parse(jsonText);
   
   return { analysisResult, sourceData };

@@ -2,14 +2,17 @@
  * Secret Manager Service
  * 
  * This service fetches API keys from the backend instead of storing them client-side.
- * The backend retrieves secrets from Google Cloud Secret Manager.
+ * The backend retrieves secrets from Replit Secrets.
  */
 
 // Cache for fetched secrets to avoid repeated API calls
 const secretsCache: { [key: string]: string } = {};
 
-declare const __VITE_BACKEND_URL__: string;
-const BACKEND_URL = typeof __VITE_BACKEND_URL__ !== 'undefined' ? __VITE_BACKEND_URL__ : "http://localhost:8000";
+// Use relative URLs in development (Vite proxy) and production (same origin)
+// This works because:
+// - In dev: Vite proxy forwards /api to http://localhost:8000
+// - In prod: Backend serves both static files and API on same origin
+const BACKEND_URL = "";
 
 async function fetchSecret(secretName: string): Promise<string> {
   // Return from cache if available
