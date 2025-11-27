@@ -1,12 +1,11 @@
 """
-Flask backend for PharmKo - handles API secrets securely via Google Cloud Secret Manager
+Flask backend for PharmKo - handles API secrets securely via Replit Secrets
 """
 import os
 import logging
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
-from google.cloud import secretmanager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,33 +14,23 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__, static_folder=None)
 CORS(app)
 
-# Cache for secrets to avoid repeated API calls
+# Cache for secrets to avoid repeated lookups
 _secrets_cache = {}
 
-def get_secret(secret_name: str, project_id: str = None) -> str:
+def get_secret(secret_name: str) -> str:
     """
-    Retrieve a secret from Google Cloud Secret Manager.
+    Retrieve a secret from environment variables (Replit Secrets).
     """
-    if not project_id:
-        project_id = os.environ.get("GCP_PROJECT_ID")
-        if not project_id:
-            raise ValueError("GCP_PROJECT_ID environment variable not set")
+    if secret_name in _secrets_cache:
+        return _secrets_cache[secret_name]
     
-    cache_key = f"{project_id}/{secret_name}"
-    if cache_key in _secrets_cache:
-        return _secrets_cache[cache_key]
+    secret_value = os.environ.get(secret_name)
+    if not secret_value:
+        raise ValueError(f"Secret '{secret_name}' not found in environment variables")
     
-    try:
-        client = secretmanager.SecretManagerServiceClient()
-        secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
-        response = client.access_secret_version(request={"name": secret_path})
-        secret_value = response.payload.data.decode("UTF-8")
-        _secrets_cache[cache_key] = secret_value
-        logger.info(f"Retrieved secret: {secret_name}")
-        return secret_value
-    except Exception as e:
-        logger.error(f"Failed to retrieve secret {secret_name}: {str(e)}")
-        raise
+    _secrets_cache[secret_name] = secret_value
+    logger.info(f"Retrieved secret: {secret_name}")
+    return secret_value
 
 
 # API Routes
@@ -53,9 +42,9 @@ def health_check():
 
 @app.route("/api/secrets/gemini-key", methods=["GET"])
 def get_gemini_key():
-    """Get Gemini API key from Secret Manager"""
+    """Get Gemini API key from environment"""
     try:
-        api_key = get_secret("gemini-api-key")
+        api_key = get_secret("GEMINI_API_KEY")
         return jsonify({"api_key": api_key}), 200
     except Exception as e:
         logger.error(f"Error retrieving Gemini key: {str(e)}")
@@ -64,9 +53,9 @@ def get_gemini_key():
 
 @app.route("/api/secrets/fda-key", methods=["GET"])
 def get_fda_key():
-    """Get FDA API key from Secret Manager"""
+    """Get FDA API key from environment"""
     try:
-        api_key = get_secret("fda-api-key")
+        api_key = get_secret("FDA_API_KEY")
         return jsonify({"api_key": api_key}), 200
     except Exception as e:
         logger.error(f"Error retrieving FDA key: {str(e)}")
@@ -77,8 +66,8 @@ def get_fda_key():
 def get_config():
     """Check if backend is properly configured"""
     try:
-        get_secret("gemini-api-key")
-        get_secret("fda-api-key")
+        get_secret("GEMINI_API_KEY")
+        get_secret("FDA_API_KEY")
         return jsonify({
             "ready": True,
             "message": "Backend is configured and secrets are accessible"
@@ -162,7 +151,7 @@ def serve_react_app(path):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("BACKEND_PORT", 8000))
     dist_path = get_dist_path()
     
     if dist_path.exists():
@@ -170,5 +159,5 @@ if __name__ == "__main__":
     else:
         logger.warning(f"Static directory not found at: {dist_path}")
     
-    logger.info(f"Starting Flask app on port {port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    logger.info(f"Starting Flask app on localhost:{port}")
+    app.run(host="127.0.0.1", port=port, debug=False)
