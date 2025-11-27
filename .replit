@@ -36,3 +36,8 @@ externalPort = 80
 [[ports]]
 localPort = 41625
 externalPort = 3000
+
+[deployment]
+deploymentTarget = "vm"
+run = ["bash", "-c", "cd backend && python main.py"]
+build = ["npm", "run", "build"]
