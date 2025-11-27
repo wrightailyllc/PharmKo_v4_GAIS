@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "setup-secrets": "bash setup-gcp-secrets.sh",
+    "test-secrets": "bash test-secrets.sh"
   },
   "dependencies": {
     "@google/genai": "^1.27.0",

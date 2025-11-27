@@ -1,21 +1,43 @@
 steps:
-  # Build the container image with secrets passed as build-args
+  # Build the container image (no longer needs API keys as build args)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
-      - '--build-arg'
-      - 'API_KEY=$_API_KEY'
-      - '--build-arg'
-      - 'FDA_API_KEY=$_FDA_API_KEY'
       - '-t'
       - 'gcr.io/$PROJECT_ID/pharmko-app:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/pharmko-app:latest'
       - '.'
 
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/pharmko-app:$COMMIT_SHA']
 
-  # Deploy container image to Cloud Run
+  # Create secrets in Google Cloud Secret Manager (if they don't exist)
+  # Replace YOUR_PROJECT_ID with your actual GCP project ID
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        # Check if secret exists, if not create it
+        if ! gcloud secrets describe gemini-api-key --project=$PROJECT_ID &>/dev/null; then
+          echo "Creating gemini-api-key secret..."
+          echo -n "$_GEMINI_API_KEY" | gcloud secrets create gemini-api-key \
+            --data-file=- \
+            --project=$PROJECT_ID \
+            --replication-policy="automatic"
+        fi
+        
+        if ! gcloud secrets describe fda-api-key --project=$PROJECT_ID &>/dev/null; then
+          echo "Creating fda-api-key secret..."
+          echo -n "$_FDA_API_KEY" | gcloud secrets create fda-api-key \
+            --data-file=- \
+            --project=$PROJECT_ID \
+            --replication-policy="automatic"
+        fi
+
+  # Deploy container image to Cloud Run with secret access
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -29,14 +51,21 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'GCP_PROJECT_ID=$PROJECT_ID'
+      - '--memory'
+      - '512Mi'
+      - '--timeout'
+      - '300'
 
 # Define the substitution variables that must be mapped in the Cloud Build Trigger
 substitutions:
-  _API_KEY: 'AIzaSyDR66Q9STwsIkySXKcRvqLLlX2irCt2GWg' # Must be set in Trigger settings
-  _FDA_API_KEY: 'M7xeeL25vsNApgZJYSzWBIvySDypNxNQC1EBivAp'
+  _GEMINI_API_KEY: '' # Must be set in Trigger settings
+  _FDA_API_KEY: ''    # Must be set in Trigger settings
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 images:
   - 'gcr.io/$PROJECT_ID/pharmko-app:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/pharmko-app:latest'

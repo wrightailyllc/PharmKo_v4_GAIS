@@ -10,28 +10,33 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
-# Accept build arguments for API keys (passed from Cloud Build via cloudbuild.yaml)
-ARG API_KEY
-ARG FDA_API_KEY
-
-# Set environment variables so Vite can bake them into the build
-ENV API_KEY=$API_KEY
-ENV FDA_API_KEY=$FDA_API_KEY
-
-# Build the application
+# Build the application (NO API KEYS needed at build time anymore)
 RUN npm run build
 
-# Stage 2: Serve the application using Nginx
-FROM nginx:alpine
+# Stage 2: Python backend with Flask
+FROM python:3.11-slim
 
-# Copy the built assets from the previous stage to the Nginx html directory
-COPY --from=build /app/dist /usr/share/nginx/html
+WORKDIR /app
 
-# Copy custom Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy Python requirements and install dependencies
+COPY backend/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose port 8080 (standard for Google Cloud Run)
+# Copy the built React app from build stage
+COPY --from=build /app/dist /app/static
+
+# Copy the Python backend
+COPY backend/main.py ./
+
+# Copy Nginx configuration for serving the static site
+COPY nginx.conf ./
+
+# Expose port 8080 (for Cloud Run)
 EXPOSE 8080
 
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Set environment variables
+ENV FLASK_APP=main.py
+ENV PORT=8080
+
+# Run the Flask app
+CMD ["python", "main.py"]

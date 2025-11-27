@@ -2,12 +2,11 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import type { AnalysisResult, SourceData } from '../types';
+import { getGeminiApiKey, getFdaApiKey } from './secretManager';
 
-// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-// Assume this variable is pre-configured, valid, and accessible.
-const ai = new GoogleGenAI({ apiKey: 'AIzaSyDR66Q9STwsIkySXKcRvqLLlX2irCt2GWg' });
-
-const fdaApiKey = 'M7xeeL25vsNApgZJYSzWBIvySDypNxNQC1EBivAp';
+// API keys are now fetched from the backend which retrieves them from Google Cloud Secret Manager
+let ai: GoogleGenAI | null = null;
+let cachedFdaApiKey: string | null = null;
 
 // --- Helper Functions ---
 
@@ -49,6 +48,7 @@ const fetchRxNormData = async (drugName: string) => {
 };
 
 const fetchFdaData = async (drugName: string, activeIngredient: string) => {
+  const fdaApiKey = await getFdaApiKey();
   const fdaApiBase = 'https://api.fda.gov/drug';
   const addApiKey = (url: string) => fdaApiKey ? `${url}&api_key=${fdaApiKey}` : url;
 
@@ -264,6 +264,12 @@ export const analyzeDrugSafety = async (
     },
     required: ["drugLabelAnalysis", "clinicalTrialAnalysis", "adverseEffectsProfile", "journalAnalysis", "drugInteractions", "potentialHarmScore", "citations"],
   };
+
+  // Initialize Gemini AI client with the API key from Secret Manager
+  if (!ai) {
+    const geminiApiKey = await getGeminiApiKey();
+    ai = new GoogleGenAI({ apiKey: geminiApiKey });
+  }
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
