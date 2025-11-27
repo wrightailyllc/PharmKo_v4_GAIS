@@ -109,6 +109,42 @@ def get_config():
         }), 500
 
 
+@app.route("/", methods=["GET"])
+@app.route("/<path:filename>", methods=["GET"])
+def serve_static(filename="index.html"):
+    """
+    Serve static React app files.
+    For any request that's not an /api/ endpoint, serve the React app.
+    This enables client-side routing to work properly.
+    """
+    try:
+        # Map request to static file
+        static_dir = os.path.join(os.path.dirname(__file__), "..", "dist")
+        
+        # If requesting root or any path, try to serve the file, fallback to index.html
+        if filename and not filename.startswith("api/"):
+            file_path = os.path.join(static_dir, filename)
+            # Security: prevent directory traversal
+            if os.path.abspath(file_path).startswith(os.path.abspath(static_dir)):
+                if os.path.exists(file_path) and os.path.isfile(file_path):
+                    return app.send_static_file(filename)
+        
+        # Default to index.html for client-side routing
+        return app.send_static_file("index.html")
+    except Exception as e:
+        logger.error(f"Error serving static file: {str(e)}")
+        return jsonify({"error": "Not found"}), 404
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    
+    # Set static folder for Flask
+    static_dir = os.path.join(os.path.dirname(__file__), "..", "dist")
+    app.static_folder = static_dir
+    app.static_url_path = "/"
+    
+    logger.info(f"Serving static files from: {static_dir}")
+    logger.info(f"Starting Flask app on port {port}")
+    
     app.run(host="0.0.0.0", port=port, debug=False)
