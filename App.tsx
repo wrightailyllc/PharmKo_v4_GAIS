@@ -17,6 +17,9 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-gray-900 text-gray-200 min-h-screen font-sans">
+      <div className="bg-yellow-500 text-black text-center p-2 font-bold">
+        This is the new version!
+      </div>
       <Header isAuthenticated={isAuthenticated} onLogout={handleLogout} />
       <main className="container mx-auto px-4 py-8">
         {isAuthenticated ? (
