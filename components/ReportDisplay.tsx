@@ -36,6 +36,40 @@ const HarmScoreBar: React.FC<{ score: number }> = ({ score }) => {
             <div className="w-full bg-gray-700 rounded-full h-4">
                 <div className={`h-4 rounded-full ${barColor}`} style={{ width: `${percentage}%` }}></div>
             </div>
+            <div className="text-center mt-2">
+                <span className="text-2xl font-bold text-white">{score.toFixed(1)}</span>
+                <span className="text-gray-400 ml-1">/ 10</span>
+            </div>
+        </div>
+    );
+};
+
+interface ScoreBreakdownItemProps {
+    label: string;
+    score: number;
+    weight: number;
+    contribution: number;
+    details: string;
+}
+
+const ScoreBreakdownItem: React.FC<ScoreBreakdownItemProps> = ({ label, score, weight, contribution, details }) => {
+    let barColor = 'bg-green-500';
+    if (score > 4) barColor = 'bg-yellow-500';
+    if (score > 7) barColor = 'bg-red-500';
+    
+    return (
+        <div className="p-3 bg-gray-900/50 rounded-md border border-gray-700">
+            <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold text-white">{label}</span>
+                <span className="text-sm text-gray-400">{(weight * 100).toFixed(0)}% weight</span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+                <div className={`h-2 rounded-full ${barColor}`} style={{ width: `${score * 10}%` }}></div>
+            </div>
+            <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{details}</span>
+                <span className="font-medium text-white">Score: {score}/10 (+{contribution.toFixed(2)})</span>
+            </div>
         </div>
     );
 };
@@ -155,6 +189,39 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({ result, drugName }
           <div className="mt-4">
               <HarmScoreBar score={result.potentialHarmScore.score} />
           </div>
+          
+          {result.potentialHarmScore.scoreBreakdown && (
+            <div className="mt-6">
+              <h4 className="font-semibold text-white mb-3">Score Breakdown by Category</h4>
+              <div className="space-y-3">
+                <ScoreBreakdownItem 
+                  label="Adverse Events Volume (25%)"
+                  {...result.potentialHarmScore.scoreBreakdown.adverseEventsVolume}
+                />
+                <ScoreBreakdownItem 
+                  label="Severity of Events (20%)"
+                  {...result.potentialHarmScore.scoreBreakdown.severityOfEvents}
+                />
+                <ScoreBreakdownItem 
+                  label="Clinical Trial Support (15%)"
+                  {...result.potentialHarmScore.scoreBreakdown.clinicalTrialSupport}
+                />
+                <ScoreBreakdownItem 
+                  label="Journal Article Signals (15%)"
+                  {...result.potentialHarmScore.scoreBreakdown.journalArticleSignals}
+                />
+                <ScoreBreakdownItem 
+                  label="Label Warnings (15%)"
+                  {...result.potentialHarmScore.scoreBreakdown.labelWarnings}
+                />
+                <ScoreBreakdownItem 
+                  label="Drug Interactions (10%)"
+                  {...result.potentialHarmScore.scoreBreakdown.interactions}
+                />
+              </div>
+            </div>
+          )}
+          
           <div className="mt-6 p-3 bg-indigo-900/40 border border-indigo-700 rounded-md flex items-center gap-4">
               <LockClosedIcon className="h-6 w-6 text-indigo-400 flex-shrink-0"/>
               <div>

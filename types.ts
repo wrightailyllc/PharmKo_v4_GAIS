@@ -43,9 +43,26 @@ export interface DrugInteractions {
   interactions: DrugInteraction[];
 }
 
+export interface ScoreComponent {
+  score: number;
+  weight: number;
+  contribution: number;
+  details: string;
+}
+
+export interface ScoreBreakdown {
+  adverseEventsVolume: ScoreComponent;
+  severityOfEvents: ScoreComponent;
+  clinicalTrialSupport: ScoreComponent;
+  journalArticleSignals: ScoreComponent;
+  labelWarnings: ScoreComponent;
+  interactions: ScoreComponent;
+}
+
 export interface PotentialHarmScore {
   summary: string;
   score: number;
+  scoreBreakdown?: ScoreBreakdown;
 }
 
 export interface Citation {
