@@ -12,9 +12,9 @@ const SCORING_WEIGHTS = {
   adverseEventsVolume: 0.25,    // 25% - Total FAERS adverse event reports
   severityOfEvents: 0.20,       // 20% - % of serious events (death, disability, etc.)
   clinicalTrialSupport: 0.15,   // 15% - Max phase reached (higher = safer)
-  journalArticleSignals: 0.15,  // 15% - Article count + paywall ratio + keywords
-  labelWarnings: 0.15,          // 15% - Black box warning present
-  interactions: 0.10,           // 10% - Count + severity of interactions
+  journalArticleSignals: 0.25,  // 25% - Article count + paywall ratio + keywords
+  labelWarnings: 0.10,          // 10% - Black box warning present
+  interactions: 0.05,           // 5% - Count + severity of interactions
 };
 
 // Serious event keywords for severity calculation

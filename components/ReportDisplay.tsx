@@ -207,15 +207,15 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({ result, drugName }
                   {...result.potentialHarmScore.scoreBreakdown.clinicalTrialSupport}
                 />
                 <ScoreBreakdownItem 
-                  label="Journal Article Signals (15%)"
+                  label="Journal Article Signals (25%)"
                   {...result.potentialHarmScore.scoreBreakdown.journalArticleSignals}
                 />
                 <ScoreBreakdownItem 
-                  label="Label Warnings (15%)"
+                  label="Label Warnings (10%)"
                   {...result.potentialHarmScore.scoreBreakdown.labelWarnings}
                 />
                 <ScoreBreakdownItem 
-                  label="Drug Interactions (10%)"
+                  label="Drug Interactions (5%)"
                   {...result.potentialHarmScore.scoreBreakdown.interactions}
                 />
               </div>
