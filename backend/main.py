@@ -92,55 +92,15 @@ def get_config():
 
 
 # Static file serving - serve React app
-def get_dist_path():
-    """Get absolute path to dist folder"""
-    """
-    Try a few common locations for the built React `dist` folder and return the first one that exists.
-    Search order (most to least likely):
-      - sibling `dist` next to the project root when main.py is inside `backend/` (../dist)
-      - `dist` in the same directory as the running file (./dist)
-      - `/app/dist` which is used inside the container
-      - current working directory `./dist`
-    Also supports overriding via STATIC_DIR env var.
-    """
-    # Explicit override
-    env_override = os.environ.get("STATIC_DIR")
-    if env_override:
-        p = Path(env_override).resolve()
-        logger.info(f"STATIC_DIR override set: {p}")
-        return p
-
-    app_dir = Path(__file__).resolve().parent
-    candidates = [
-        (app_dir.parent / "dist").resolve(),  # ../dist when main.py is in backend/
-        (app_dir / "dist").resolve(),         # ./dist next to main.py
-        Path("/app/dist").resolve(),          # container common path
-        (Path.cwd() / "dist").resolve(),      # project root dist
-    ]
-
-    for c in candidates:
-        try:
-            if c.exists() and c.is_dir():
-                logger.info(f"Using dist path: {c}")
-                return c
-        except Exception:
-            continue
-
-    # Fallback (not found)
-    fallback = (app_dir.parent / "dist").resolve()
-    logger.warning(f"No dist directory found in candidates, returning fallback: {fallback}")
-    return fallback
-
-
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_react_app(path):
     """Serve React app and handle client-side routing"""
+    dist_path = Path("/app/dist").resolve()
+
     # Skip API routes
     if path.startswith("api/"):
         return jsonify({"error": "Not found"}), 404
-    
-    dist_path = get_dist_path()
     
     # Try to serve the requested file
     if path:
@@ -163,12 +123,5 @@ def serve_react_app(path):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    dist_path = get_dist_path()
-    
-    if dist_path.exists():
-        logger.info(f"Serving static files from: {dist_path}")
-    else:
-        logger.warning(f"Static directory not found at: {dist_path}")
-    
     logger.info(f"Starting Flask app on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)
