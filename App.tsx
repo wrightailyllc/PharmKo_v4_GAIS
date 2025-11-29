@@ -46,7 +46,8 @@ const App: React.FC = () => {
           enabled: data.auth_enabled,
           google_oauth: data.google_oauth_configured,
           facebook_oauth: data.facebook_oauth_configured,
-          database_ready: data.database_ready
+          database_ready: data.database_ready,
+          facebook_app_id: data.facebook_app_id
         });
         
         if (!data.auth_enabled && !storedToken) {
@@ -65,7 +66,6 @@ const App: React.FC = () => {
   const handleOAuthCallback = useCallback(async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
-    const state = urlParams.get('state');
     
     if (code) {
       const isGoogle = window.location.pathname.includes('google');
@@ -84,9 +84,30 @@ const App: React.FC = () => {
           const data = await response.json();
           if (data.success) {
             handleLoginSuccess(data.user, data.session_token, data.is_new_user);
+          } else {
+            console.error('Google OAuth error:', data.error);
           }
         } catch (err) {
           console.error('Google OAuth callback error:', err);
+        }
+      } else if (isFacebook) {
+        try {
+          const response = await fetch(`${BACKEND_URL}/api/auth/facebook/callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              code, 
+              redirect_uri: `${window.location.origin}/auth/facebook/callback` 
+            })
+          });
+          const data = await response.json();
+          if (data.success) {
+            handleLoginSuccess(data.user, data.session_token, data.is_new_user);
+          } else {
+            console.error('Facebook OAuth error:', data.error);
+          }
+        } catch (err) {
+          console.error('Facebook OAuth callback error:', err);
         }
       }
       
@@ -176,6 +197,7 @@ const App: React.FC = () => {
         onClose={() => setShowAuthModal(false)}
         onLoginSuccess={handleLoginSuccess}
         backendUrl={BACKEND_URL}
+        facebookAppId={authConfig?.facebook_app_id}
       />
 
       {showProfileForm && user && sessionToken && (

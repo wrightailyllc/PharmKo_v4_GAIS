@@ -185,11 +185,13 @@ def get_config():
 @app.route("/api/auth/status", methods=["GET"])
 def auth_status():
     """Check authentication status and configuration"""
+    facebook_app_id = os.environ.get("FACEBOOK_APP_ID")
     return jsonify({
         "auth_enabled": AUTH_ENABLED,
         "google_oauth_configured": bool(os.environ.get("GOOGLE_OAUTH_CLIENT_ID")),
-        "facebook_oauth_configured": bool(os.environ.get("FACEBOOK_APP_ID")),
-        "database_ready": is_gcloud_sql_available()
+        "facebook_oauth_configured": bool(facebook_app_id),
+        "database_ready": is_gcloud_sql_available(),
+        "facebook_app_id": facebook_app_id
     }), 200
 
 
@@ -300,16 +302,47 @@ def google_callback():
 
 @app.route("/api/auth/facebook/callback", methods=["POST"])
 def facebook_callback():
-    """Handle Facebook OAuth callback"""
+    """Handle Facebook OAuth callback - exchanges code for access token"""
     if not AUTH_SERVICE:
         return jsonify({"error": "Authentication service not available"}), 503
     
     try:
         data = request.get_json()
-        access_token = data.get("access_token")
+        code = data.get("code")
+        redirect_uri = data.get("redirect_uri")
         
+        if not code:
+            return jsonify({"error": "Authorization code required"}), 400
+        
+        if not redirect_uri:
+            return jsonify({"error": "Redirect URI required"}), 400
+        
+        facebook_app_id = os.environ.get("FACEBOOK_APP_ID")
+        facebook_app_secret = os.environ.get("FACEBOOK_APP_SECRET")
+        
+        if not facebook_app_id or not facebook_app_secret:
+            return jsonify({"error": "Facebook OAuth not configured"}), 503
+        
+        import requests as http_requests
+        token_url = "https://graph.facebook.com/v18.0/oauth/access_token"
+        token_params = {
+            "client_id": facebook_app_id,
+            "client_secret": facebook_app_secret,
+            "code": code,
+            "redirect_uri": redirect_uri
+        }
+        
+        token_response = http_requests.get(token_url, params=token_params)
+        token_data = token_response.json()
+        
+        if "error" in token_data:
+            error_msg = token_data.get("error", {}).get("message", "Unknown error")
+            logger.error(f"Facebook token exchange error: {error_msg}")
+            return jsonify({"error": f"Facebook authentication failed: {error_msg}"}), 401
+        
+        access_token = token_data.get("access_token")
         if not access_token:
-            return jsonify({"error": "Access token required"}), 400
+            return jsonify({"error": "Failed to obtain access token"}), 401
         
         result = AUTH_SERVICE.login_facebook(access_token)
         if result["success"]:

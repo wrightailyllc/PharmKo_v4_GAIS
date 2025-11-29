@@ -6,11 +6,12 @@ interface AuthModalProps {
   onClose: () => void;
   onLoginSuccess: (user: any, token: string) => void;
   backendUrl: string;
+  facebookAppId?: string;
 }
 
 type AuthMode = 'login' | 'register';
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, backendUrl }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, backendUrl, facebookAppId }) => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -67,15 +68,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
   };
 
   const handleFacebookLogin = () => {
-    const appId = (window as any).FACEBOOK_APP_ID;
-    if (!appId) {
+    if (!facebookAppId) {
       setError('Facebook login not configured');
       return;
     }
     
     const redirectUri = `${window.location.origin}/auth/facebook/callback`;
     const scope = 'email,public_profile';
-    window.location.href = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+    window.location.href = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${facebookAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
   };
 
   return (
