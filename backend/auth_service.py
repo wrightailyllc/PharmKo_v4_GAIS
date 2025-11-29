@@ -381,11 +381,11 @@ class AuthService:
                             'zip_code', 'birth_year', 'current_medications']
             
             updates = []
-            values = []
+            params = {}
             for field in allowed_fields:
                 if field in profile_data:
-                    updates.append(f"{field} = %s")
-                    values.append(profile_data[field])
+                    updates.append(f"{field} = :{field}")
+                    params[field] = profile_data[field]
             
             if not updates:
                 return {"success": False, "error": "No valid fields to update"}
@@ -400,19 +400,15 @@ class AuthService:
                 current = user[0]
                 merged = {**current, **profile_data}
                 profile_complete = all(merged.get(f) for f in required_fields)
-                updates.append("profile_complete = %s")
-                values.append(profile_complete)
+                updates.append("profile_complete = :profile_complete")
+                params["profile_complete"] = profile_complete
             
             updates.append("updated_at = CURRENT_TIMESTAMP")
-            values.append(user_id)
+            params["user_id"] = user_id
             
-            params = {f"val{i}": v for i, v in enumerate(values[:-1])}
-            params["user_id"] = values[-1]
-            param_placeholders = ', '.join([f"{field} = :val{i}" if '%s' in updates[i] else updates[i] 
-                                           for i, field in enumerate(updates)])
             self.execute_write(
                 f"UPDATE users SET {', '.join(updates)} WHERE id = :user_id",
-                {**params, "user_id": user_id}
+                params
             )
             
             updated_user = self.execute_query(
