@@ -681,23 +681,6 @@ def serve_react_app(path):
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
-    is_production = os.environ.get("REPL_DEPLOYMENT", "false").lower() == "true"
-    
-    port = 5000 if is_production else int(os.environ.get("BACKEND_PORT", 8000))
-    host = "0.0.0.0"
-    
-    dist_path = get_dist_path()
-    
-    if dist_path.exists():
-        logger.info(f"Serving static files from: {dist_path}")
-    else:
-        logger.warning(f"Static directory not found at: {dist_path}")
-    
-    logger.info(f"Starting Flask app on {host}:{port} (production: {is_production})")
-    app.run(host=host, port=port, debug=False)
-=======
     port = int(os.environ.get("PORT", 5000))
     logger.info(f"Starting Flask app on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)
->>>>>>> b59e1be9cef879cb564122497a528478ef436ea9
