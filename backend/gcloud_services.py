@@ -354,7 +354,7 @@ def get_sql_engine():
     if _sql_engine is not None:
         return _sql_engine
     
-    _get_credentials()
+    credentials = _get_credentials()
     
     from google.cloud.sql.connector import Connector, IPTypes
     import sqlalchemy
@@ -371,7 +371,8 @@ def get_sql_engine():
     if not all([db_user, db_pass, db_name]):
         raise ValueError("CLOUD_SQL_USER, CLOUD_SQL_PASSWORD, and CLOUD_SQL_DATABASE must be set")
     
-    _sql_connector = Connector()
+    # Pass credentials explicitly to work from outside GCP
+    _sql_connector = Connector(credentials=credentials)
     
     if db_type == "postgresql":
         driver = "pg8000"
