@@ -188,12 +188,19 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-gray-900 text-gray-200 min-h-screen font-sans">
+<<<<<<< HEAD
       <Header 
         isAuthenticated={isAuthenticated} 
         onLogout={handleLogout}
         user={user}
         onEditProfile={() => setShowProfileForm(true)}
       />
+=======
+      <div className="bg-yellow-500 text-black text-center p-2 font-bold">
+        This is the new version!
+      </div>
+      <Header isAuthenticated={isAuthenticated} onLogout={handleLogout} />
+>>>>>>> b59e1be9cef879cb564122497a528478ef436ea9
       <main className="container mx-auto px-4 py-8">
         {currentPage === 'privacy' ? (
           <PrivacyPolicy onBack={() => setCurrentPage('home')} />

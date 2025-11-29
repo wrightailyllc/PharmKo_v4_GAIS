@@ -23,7 +23,7 @@ COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the built React app from build stage
-COPY --from=build /app/dist /app/static
+COPY --from=build /app/dist /app/dist
 
 # Copy the Python backend
 COPY backend/main.py ./
