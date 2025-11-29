@@ -1,7 +1,7 @@
 # PharmKo - Pharmaceutical Safety Analysis App
 
 ## Overview
-PharmKo is a comprehensive pharmaceutical safety analysis application that uses AI to analyze drug safety data from multiple authoritative sources including the FDA, PubMed, ClinicalTrials.gov, and Europe PMC.
+PharmKo is a comprehensive pharmaceutical safety analysis application that uses AI to analyze drug safety data from multiple authoritative sources including the FDA, PubMed, ClinicalTrials.gov, and Europe PMC. The app includes user authentication with Google OAuth, Facebook OAuth, and email/password login, along with user profile management.
 
 ## Project Structure
 
@@ -66,6 +66,21 @@ For Google Cloud Storage and Cloud SQL integration, add these secrets:
 
 9. **CLOUD_SQL_TYPE**: Database type (`mysql` or `postgresql`, defaults to `mysql`)
 
+### Authentication (Optional - for user login)
+10. **GOOGLE_OAUTH_CLIENT_ID**: Google OAuth 2.0 Client ID
+    - Create at: https://console.cloud.google.com/apis/credentials
+    - Add redirect URI: `https://YOUR_REPLIT_DOMAIN/auth/google/callback`
+
+11. **GOOGLE_OAUTH_CLIENT_SECRET**: Google OAuth 2.0 Client Secret
+
+12. **FACEBOOK_APP_ID**: Facebook App ID for OAuth
+    - Create at: https://developers.facebook.com/apps
+    - Add redirect URI: `https://YOUR_REPLIT_DOMAIN/auth/facebook/callback`
+
+13. **FACEBOOK_APP_SECRET**: Facebook App Secret
+
+14. **AUTH_ENABLED**: Set to "false" to disable authentication (default: "true")
+
 To add these secrets:
 1. Click on "Secrets" in the left sidebar
 2. Add each secret with the exact name shown above
@@ -96,6 +111,27 @@ When deployed, the backend automatically:
 - Provides API key endpoints
 
 ## Recent Changes
+
+### User Authentication System (November 29, 2025)
+- Implemented full authentication with Google OAuth, Facebook OAuth, and email/password
+- Created user database schema in Cloud SQL with profile fields:
+  - Email, username, first/last name, city, state, zip code
+  - Birth year, current medications list
+  - OAuth provider tracking and profile picture support
+- Added authentication API endpoints:
+  - `POST /api/auth/register` - Email/password registration
+  - `POST /api/auth/login` - Email/password login
+  - `GET /api/auth/google` - Google OAuth initiation
+  - `POST /api/auth/google/callback` - Google OAuth callback
+  - `POST /api/auth/facebook/callback` - Facebook OAuth callback
+  - `PUT /api/auth/profile` - Update user profile
+  - `POST /api/auth/toggle` - Enable/disable authentication
+- Created frontend components:
+  - AuthModal for login/signup with OAuth buttons
+  - ProfileForm for collecting user profile data
+  - Header with user dropdown menu and profile editing
+- Authentication can be toggled on/off via `AUTH_ENABLED` environment variable
+- OAuth profile data (name, email, picture, location) is automatically extracted
 
 ### Smart Query Caching (November 29, 2025)
 - Implemented 30-day query result reuse via Cloud SQL
@@ -128,11 +164,15 @@ None documented yet.
 
 ## Key Files
 - `start.sh`: Startup script for development mode
-- `backend/main.py`: Flask backend with secret management and GCloud endpoints
+- `backend/main.py`: Flask backend with secret management, GCloud endpoints, and auth API
 - `backend/gcloud_services.py`: Google Cloud Storage and Cloud SQL integration
+- `backend/auth_service.py`: Authentication service with OAuth and email/password support
 - `vite.config.ts`: Vite configuration with Replit settings
 - `services/secretManager.ts`: Frontend service for fetching API keys
 - `services/geminiService.ts`: AI analysis service with weighted scoring
+- `components/AuthModal.tsx`: Login/signup modal with OAuth buttons
+- `components/ProfileForm.tsx`: User profile data collection form
+- `types/auth.ts`: TypeScript types for authentication
 
 ## External APIs Used
 - Google Gemini API (AI analysis)
