@@ -723,12 +723,8 @@ def serve_react_app(path):
 if __name__ == "__main__":
     is_production = os.environ.get("REPL_DEPLOYMENT", "false").lower() == "true"
     
-    if is_production:
-        port = 5000
-        host = "0.0.0.0"
-    else:
-        port = int(os.environ.get("BACKEND_PORT", 8000))
-        host = "127.0.0.1"
+    port = 5000 if is_production else int(os.environ.get("BACKEND_PORT", 8000))
+    host = "0.0.0.0"
     
     dist_path = get_dist_path()
     

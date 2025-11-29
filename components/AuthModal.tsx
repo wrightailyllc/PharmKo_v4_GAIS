@@ -41,9 +41,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
 
     try {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const response = await fetch(`${backendUrl}${endpoint}`, {
+      const url = `${backendUrl}${endpoint}`;
+      
+      console.log('Auth request:', { backendUrl, endpoint, url, email });
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password, username: username || undefined })
       });
 
@@ -56,6 +61,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
         setError(data.error || 'Authentication failed');
       }
     } catch (err) {
+      console.error('Auth error:', err);
       setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
