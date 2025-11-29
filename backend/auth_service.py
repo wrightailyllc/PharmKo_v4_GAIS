@@ -108,8 +108,8 @@ class AuthService:
         
         try:
             existing = self.execute_query(
-                "SELECT id FROM users WHERE email = %s",
-                (email,)
+                "SELECT id FROM users WHERE email = :email",
+                {"email": email}
             )
             if existing:
                 return {"success": False, "error": "Email already registered"}
@@ -118,13 +118,13 @@ class AuthService:
             
             self.execute_write(
                 """INSERT INTO users (email, username, password_hash, password_salt, auth_provider, email_verified)
-                   VALUES (%s, %s, %s, %s, 'email', FALSE)""",
-                (email, username or email.split('@')[0], password_hash, password_salt)
+                   VALUES (:email, :username, :password_hash, :password_salt, 'email', FALSE)""",
+                {"email": email, "username": username or email.split('@')[0], "password_hash": password_hash, "password_salt": password_salt}
             )
             
             user = self.execute_query(
-                "SELECT id, email, username FROM users WHERE email = %s",
-                (email,)
+                "SELECT id, email, username FROM users WHERE email = :email",
+                {"email": email}
             )
             
             if user:
@@ -154,8 +154,8 @@ class AuthService:
             user = self.execute_query(
                 """SELECT id, email, username, first_name, last_name, password_hash, password_salt, 
                           profile_complete, profile_picture_url
-                   FROM users WHERE email = %s AND auth_provider = 'email'""",
-                (email,)
+                   FROM users WHERE email = :email AND auth_provider = 'email'""",
+                {"email": email}
             )
             
             if not user:
@@ -166,8 +166,8 @@ class AuthService:
                 return {"success": False, "error": "Invalid email or password"}
             
             self.execute_write(
-                "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s",
-                (user['id'],)
+                "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = :user_id",
+                {"user_id": user['id']}
             )
             
             session_token = self._create_session(user['id'])
@@ -300,24 +300,25 @@ class AuthService:
         
         try:
             existing = self.execute_query(
-                "SELECT * FROM users WHERE email = %s OR (oauth_id = %s AND auth_provider = %s)",
-                (email, oauth_id, provider)
+                "SELECT * FROM users WHERE email = :email OR (oauth_id = :oauth_id AND auth_provider = :provider)",
+                {"email": email, "oauth_id": oauth_id, "provider": provider}
             )
             
             if existing:
                 user = existing[0]
                 self.execute_write(
                     """UPDATE users SET 
-                       first_name = COALESCE(%s, first_name),
-                       last_name = COALESCE(%s, last_name),
-                       profile_picture_url = COALESCE(%s, profile_picture_url),
-                       city = COALESCE(%s, city),
-                       state = COALESCE(%s, state),
-                       email_verified = %s,
+                       first_name = COALESCE(:first_name, first_name),
+                       last_name = COALESCE(:last_name, last_name),
+                       profile_picture_url = COALESCE(:profile_picture, profile_picture_url),
+                       city = COALESCE(:city, city),
+                       state = COALESCE(:state, state),
+                       email_verified = :email_verified,
                        last_login = CURRENT_TIMESTAMP,
                        updated_at = CURRENT_TIMESTAMP
-                       WHERE id = %s""",
-                    (first_name, last_name, profile_picture, city, state, email_verified, user['id'])
+                       WHERE id = :user_id""",
+                    {"first_name": first_name, "last_name": last_name, "profile_picture": profile_picture, 
+                     "city": city, "state": state, "email_verified": email_verified, "user_id": user['id']}
                 )
                 user_id = user['id']
             else:
@@ -325,13 +326,15 @@ class AuthService:
                 self.execute_write(
                     """INSERT INTO users (email, username, first_name, last_name, auth_provider, 
                                          oauth_id, profile_picture_url, email_verified, city, state, last_login)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)""",
-                    (email, username, first_name, last_name, provider, oauth_id, 
-                     profile_picture, email_verified, city, state)
+                       VALUES (:email, :username, :first_name, :last_name, :provider, :oauth_id, 
+                               :profile_picture, :email_verified, :city, :state, CURRENT_TIMESTAMP)""",
+                    {"email": email, "username": username, "first_name": first_name, "last_name": last_name, 
+                     "provider": provider, "oauth_id": oauth_id, "profile_picture": profile_picture, 
+                     "email_verified": email_verified, "city": city, "state": state}
                 )
                 new_user = self.execute_query(
-                    "SELECT id FROM users WHERE email = %s",
-                    (email,)
+                    "SELECT id FROM users WHERE email = :email",
+                    {"email": email}
                 )
                 user_id = new_user[0]['id']
             
@@ -339,8 +342,8 @@ class AuthService:
                 """SELECT id, email, username, first_name, last_name, city, state, 
                           zip_code, birth_year, current_medications, profile_complete, 
                           profile_picture_url
-                   FROM users WHERE id = %s""",
-                (user_id,)
+                   FROM users WHERE id = :user_id""",
+                {"user_id": user_id}
             )[0]
             
             session_token = self._create_session(user_id)
@@ -389,8 +392,8 @@ class AuthService:
             
             required_fields = ['first_name', 'last_name', 'city', 'state', 'zip_code', 'birth_year']
             user = self.execute_query(
-                f"SELECT {', '.join(required_fields)} FROM users WHERE id = %s",
-                (user_id,)
+                f"SELECT {', '.join(required_fields)} FROM users WHERE id = :user_id",
+                {"user_id": user_id}
             )
             
             if user:
@@ -403,17 +406,21 @@ class AuthService:
             updates.append("updated_at = CURRENT_TIMESTAMP")
             values.append(user_id)
             
+            params = {f"val{i}": v for i, v in enumerate(values[:-1])}
+            params["user_id"] = values[-1]
+            param_placeholders = ', '.join([f"{field} = :val{i}" if '%s' in updates[i] else updates[i] 
+                                           for i, field in enumerate(updates)])
             self.execute_write(
-                f"UPDATE users SET {', '.join(updates)} WHERE id = %s",
-                tuple(values)
+                f"UPDATE users SET {', '.join(updates)} WHERE id = :user_id",
+                {**params, "user_id": user_id}
             )
             
             updated_user = self.execute_query(
                 """SELECT id, email, username, first_name, last_name, city, state, 
                           zip_code, birth_year, current_medications, profile_complete, 
                           profile_picture_url
-                   FROM users WHERE id = %s""",
-                (user_id,)
+                   FROM users WHERE id = :user_id""",
+                {"user_id": user_id}
             )[0]
             
             return {
@@ -432,8 +439,8 @@ class AuthService:
         try:
             session = self.execute_query(
                 """SELECT user_id FROM user_sessions 
-                   WHERE session_token = %s AND expires_at > CURRENT_TIMESTAMP""",
-                (session_token,)
+                   WHERE session_token = :session_token AND expires_at > CURRENT_TIMESTAMP""",
+                {"session_token": session_token}
             )
             
             if not session:
@@ -443,8 +450,8 @@ class AuthService:
                 """SELECT id, email, username, first_name, last_name, city, state, 
                           zip_code, birth_year, current_medications, profile_complete, 
                           profile_picture_url, auth_provider
-                   FROM users WHERE id = %s""",
-                (session[0]['user_id'],)
+                   FROM users WHERE id = :user_id""",
+                {"user_id": session[0]['user_id']}
             )
             
             return user[0] if user else None
@@ -459,8 +466,8 @@ class AuthService:
         
         try:
             self.execute_write(
-                "DELETE FROM user_sessions WHERE session_token = %s",
-                (session_token,)
+                "DELETE FROM user_sessions WHERE session_token = :session_token",
+                {"session_token": session_token}
             )
             return True
         except Exception as e:
@@ -475,8 +482,8 @@ class AuthService:
         try:
             self.execute_write(
                 """INSERT INTO user_sessions (user_id, session_token, expires_at)
-                   VALUES (%s, %s, %s)""",
-                (user_id, session_token, expires_at)
+                   VALUES (:user_id, :session_token, :expires_at)""",
+                {"user_id": user_id, "session_token": session_token, "expires_at": expires_at}
             )
             return session_token
         except Exception as e:
