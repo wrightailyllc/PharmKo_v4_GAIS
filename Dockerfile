@@ -12,8 +12,7 @@ RUN npm install
 COPY . .
 
 # Build the application (NO API KEYS needed at build time anymore)
-# RUN npm run build
-CMD ["tail", "-f", "/dev/null"]
+RUN npm run build
 
 # Stage 2: Python backend with Flask
 FROM python:3.11-slim
