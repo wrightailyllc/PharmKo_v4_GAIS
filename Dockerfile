@@ -1,5 +1,6 @@
 # Stage 1: Build the React application
-FROM node:20-alpine AS build
+# Use a Debian-based Node image to avoid esbuild/native binary issues on Alpine (musl)
+FROM node:20-bullseye-slim AS build
 
 WORKDIR /app
 

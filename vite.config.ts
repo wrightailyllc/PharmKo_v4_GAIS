@@ -22,9 +22,5 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
     },
-    define: {
-      'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY),
-      'process.env.FDA_API_KEY': JSON.stringify(process.env.FDA_API_KEY || env.FDA_API_KEY),
-    },
   };
 });
