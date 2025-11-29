@@ -9,9 +9,21 @@ import type { UserProfile, AuthConfig } from './types/auth';
 
 type PageType = 'home' | 'privacy';
 
-const BACKEND_URL = import.meta.env.DEV 
-  ? 'http://localhost:8000' 
-  : '';
+const getBackendUrl = () => {
+  if (import.meta.env.PROD) {
+    return '';
+  }
+  
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    return `${protocol}//${hostname}:8000`;
+  }
+  
+  return 'http://localhost:8000';
+};
+
+const BACKEND_URL = getBackendUrl();
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
