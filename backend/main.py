@@ -1,8 +1,10 @@
 """
 Flask backend for PharmKo - handles API secrets securely via Replit Secrets
+Includes Google Cloud Storage and Cloud SQL integration
 """
 import os
 import logging
+import atexit
 from pathlib import Path
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
@@ -13,6 +15,38 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder=None)
 CORS(app)
+
+# Import Google Cloud services (optional - only if configured)
+try:
+    from gcloud_services import (
+        upload_file, upload_from_string, download_file, download_as_string,
+        list_blobs, delete_blob, generate_signed_url,
+        execute_query, execute_write, test_sql_connection, cleanup,
+        is_configured as gcloud_is_configured,
+        is_storage_configured as gcloud_storage_configured,
+        is_sql_configured as gcloud_sql_configured
+    )
+    GCLOUD_MODULE_LOADED = True
+    atexit.register(cleanup)
+    logger.info("Google Cloud services module loaded")
+except ImportError as e:
+    GCLOUD_MODULE_LOADED = False
+    gcloud_is_configured = lambda: False
+    gcloud_storage_configured = lambda: False
+    gcloud_sql_configured = lambda: False
+    logger.warning(f"Google Cloud services not available: {e}")
+
+def is_gcloud_available():
+    """Check if Google Cloud is both loaded and properly configured"""
+    return GCLOUD_MODULE_LOADED and gcloud_is_configured()
+
+def is_gcloud_storage_available():
+    """Check if Google Cloud Storage is available"""
+    return GCLOUD_MODULE_LOADED and gcloud_storage_configured()
+
+def is_gcloud_sql_available():
+    """Check if Google Cloud SQL is available"""
+    return GCLOUD_MODULE_LOADED and gcloud_sql_configured()
 
 # Cache for secrets to avoid repeated lookups
 _secrets_cache = {}
@@ -70,14 +104,176 @@ def get_config():
         get_secret("FDA_API_KEY")
         return jsonify({
             "ready": True,
-            "message": "Backend is configured and secrets are accessible"
+            "message": "Backend is configured and secrets are accessible",
+            "gcloud": {
+                "storage_available": is_gcloud_storage_available(),
+                "sql_available": is_gcloud_sql_available()
+            }
         }), 200
     except Exception as e:
         logger.error(f"Configuration check failed: {str(e)}")
         return jsonify({
             "ready": False,
-            "message": "Backend is not properly configured"
+            "message": "Backend is not properly configured",
+            "gcloud": {
+                "storage_available": is_gcloud_storage_available(),
+                "sql_available": is_gcloud_sql_available()
+            }
         }), 500
+
+
+# ============================================================
+# GOOGLE CLOUD STORAGE ENDPOINTS
+# ============================================================
+
+@app.route("/api/gcloud/storage/upload", methods=["POST"])
+def gcloud_upload():
+    """Upload a file to Google Cloud Storage"""
+    if not is_gcloud_storage_available():
+        return jsonify({"error": "Google Cloud Storage not configured. Set GOOGLE_APPLICATION_CREDENTIALS_JSON and GCS_BUCKET_NAME secrets."}), 503
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        destination = request.form.get('destination', file.filename)
+        make_public = request.form.get('make_public', 'false').lower() == 'true'
+        
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            file.save(tmp.name)
+            result = upload_file(
+                tmp.name, 
+                destination, 
+                content_type=file.content_type,
+                make_public=make_public
+            )
+            os.unlink(tmp.name)
+        
+        return jsonify({
+            "success": True,
+            **result
+        }), 200
+    except Exception as e:
+        logger.error(f"GCS upload error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/gcloud/storage/list", methods=["GET"])
+def gcloud_list_files():
+    """List files in Google Cloud Storage bucket"""
+    if not is_gcloud_storage_available():
+        return jsonify({"error": "Google Cloud Storage not configured"}), 503
+    
+    try:
+        prefix = request.args.get('prefix', None)
+        max_results = int(request.args.get('max_results', 100))
+        
+        files = list_blobs(prefix=prefix, max_results=max_results)
+        return jsonify({
+            "success": True,
+            "files": files,
+            "count": len(files)
+        }), 200
+    except Exception as e:
+        logger.error(f"GCS list error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/gcloud/storage/delete", methods=["DELETE"])
+def gcloud_delete_file():
+    """Delete a file from Google Cloud Storage"""
+    if not is_gcloud_storage_available():
+        return jsonify({"error": "Google Cloud Storage not configured"}), 503
+    
+    try:
+        blob_name = request.args.get('name')
+        if not blob_name:
+            return jsonify({"error": "File name required"}), 400
+        
+        delete_blob(blob_name)
+        return jsonify({
+            "success": True,
+            "deleted": blob_name
+        }), 200
+    except Exception as e:
+        logger.error(f"GCS delete error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/gcloud/storage/signed-url", methods=["GET"])
+def gcloud_signed_url():
+    """Generate a signed URL for temporary file access"""
+    if not is_gcloud_storage_available():
+        return jsonify({"error": "Google Cloud Storage not configured"}), 503
+    
+    try:
+        blob_name = request.args.get('name')
+        if not blob_name:
+            return jsonify({"error": "File name required"}), 400
+        
+        hours = int(request.args.get('hours', 24))
+        method = request.args.get('method', 'GET')
+        
+        url = generate_signed_url(blob_name, expiration_hours=hours, method=method)
+        return jsonify({
+            "success": True,
+            "signed_url": url,
+            "expires_in_hours": hours
+        }), 200
+    except Exception as e:
+        logger.error(f"GCS signed URL error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================
+# GOOGLE CLOUD SQL ENDPOINTS
+# ============================================================
+
+@app.route("/api/gcloud/sql/test", methods=["GET"])
+def gcloud_sql_test():
+    """Test Cloud SQL connection"""
+    if not is_gcloud_sql_available():
+        return jsonify({"error": "Google Cloud SQL not configured. Set CLOUD_SQL_INSTANCE, CLOUD_SQL_USER, CLOUD_SQL_PASSWORD, CLOUD_SQL_DATABASE secrets."}), 503
+    
+    try:
+        result = test_sql_connection()
+        return jsonify(result), 200 if result.get("connected") else 500
+    except Exception as e:
+        logger.error(f"Cloud SQL test error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/gcloud/sql/query", methods=["POST"])
+def gcloud_sql_query():
+    """Execute a SELECT query on Cloud SQL"""
+    if not is_gcloud_sql_available():
+        return jsonify({"error": "Google Cloud SQL not configured"}), 503
+    
+    try:
+        data = request.get_json()
+        if not data or 'query' not in data:
+            return jsonify({"error": "Query required"}), 400
+        
+        query = data['query']
+        params = data.get('params', {})
+        
+        if any(kw in query.upper() for kw in ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'TRUNCATE', 'ALTER']):
+            return jsonify({"error": "Only SELECT queries allowed via this endpoint"}), 403
+        
+        results = execute_query(query, params)
+        return jsonify({
+            "success": True,
+            "results": results,
+            "count": len(results)
+        }), 200
+    except Exception as e:
+        logger.error(f"Cloud SQL query error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 # Static file serving - serve React app

@@ -38,13 +38,33 @@ PharmKo is a comprehensive pharmaceutical safety analysis application that uses 
 
 ## Required Secrets
 
-This application requires two API keys to be configured in Replit Secrets:
+This application requires the following secrets to be configured in Replit Secrets:
 
+### Core API Keys (Required)
 1. **GEMINI_API_KEY**: Google Gemini API key for AI analysis
    - Get it from: https://aistudio.google.com/apikey
    
 2. **FDA_API_KEY**: FDA API key (optional but recommended for higher rate limits)
    - Get it from: https://open.fda.gov/apis/authentication/
+
+### Google Cloud Integration (Optional)
+For Google Cloud Storage and Cloud SQL integration, add these secrets:
+
+3. **GOOGLE_APPLICATION_CREDENTIALS_JSON**: Service account JSON key (paste entire JSON content)
+   - Create at: Google Cloud Console → IAM → Service Accounts → Create Key (JSON)
+   
+4. **GCS_BUCKET_NAME**: Your Google Cloud Storage bucket name
+
+5. **CLOUD_SQL_INSTANCE**: Cloud SQL instance connection name
+   - Format: `project-id:region:instance-name`
+   
+6. **CLOUD_SQL_USER**: Database username
+
+7. **CLOUD_SQL_PASSWORD**: Database password
+
+8. **CLOUD_SQL_DATABASE**: Database name
+
+9. **CLOUD_SQL_TYPE**: Database type (`mysql` or `postgresql`, defaults to `mysql`)
 
 To add these secrets:
 1. Click on "Secrets" in the left sidebar
@@ -77,6 +97,14 @@ When deployed, the backend automatically:
 
 ## Recent Changes
 
+### Google Cloud Integration (November 29, 2025)
+- Added Google Cloud Storage integration for file uploads/buckets
+- Added Cloud SQL integration (MySQL/PostgreSQL support)
+- Created `backend/gcloud_services.py` module with full GCS and SQL functions
+- Added REST API endpoints for storage and database operations
+- Updated scoring system weights (Journal Articles: 25%, Label Warnings: 10%, Interactions: 5%)
+- Increased AI analysis data limits to 10,000 characters
+
 ### Adapted for Replit (November 27, 2025)
 - Removed Google Cloud Secret Manager dependency
 - Updated backend to use Replit Secrets
@@ -90,10 +118,11 @@ None documented yet.
 
 ## Key Files
 - `start.sh`: Startup script for development mode
-- `backend/main.py`: Flask backend with secret management
+- `backend/main.py`: Flask backend with secret management and GCloud endpoints
+- `backend/gcloud_services.py`: Google Cloud Storage and Cloud SQL integration
 - `vite.config.ts`: Vite configuration with Replit settings
 - `services/secretManager.ts`: Frontend service for fetching API keys
-- `services/geminiService.ts`: AI analysis service
+- `services/geminiService.ts`: AI analysis service with weighted scoring
 
 ## External APIs Used
 - Google Gemini API (AI analysis)
