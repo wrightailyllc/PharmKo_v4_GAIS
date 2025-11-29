@@ -1,11 +1,12 @@
 """
 Flask backend for PharmKo - handles API secrets securely via Replit Secrets
-Includes Google Cloud Storage and Cloud SQL integration
+Includes Google Cloud Storage, Cloud SQL integration, and User Authentication
 """
 import os
 import logging
 import atexit
 from pathlib import Path
+from functools import wraps
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 
@@ -14,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder=None)
-CORS(app)
+CORS(app, supports_credentials=True)
 
 # Import Google Cloud services (optional - only if configured)
 try:
@@ -50,6 +51,40 @@ def is_gcloud_storage_available():
 def is_gcloud_sql_available():
     """Check if Google Cloud SQL is available"""
     return GCLOUD_MODULE_LOADED and gcloud_sql_configured()
+
+# Import Authentication service
+AUTH_SERVICE = None
+AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "true").lower() == "true"
+
+try:
+    from auth_service import get_auth_service, initialize_auth
+    AUTH_SERVICE = get_auth_service()
+    if AUTH_SERVICE and is_gcloud_sql_available():
+        initialize_auth()
+        logger.info("Authentication service initialized")
+except ImportError as e:
+    logger.warning(f"Authentication service not available: {e}")
+
+def require_auth(f):
+    """Decorator to require authentication for endpoints"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not AUTH_ENABLED:
+            return f(*args, **kwargs)
+        
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({"error": "Authentication required"}), 401
+        
+        token = auth_header.split(' ')[1]
+        if AUTH_SERVICE:
+            user = AUTH_SERVICE.get_user_by_session(token)
+            if not user:
+                return jsonify({"error": "Invalid or expired session"}), 401
+            request.current_user = user
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Cache for secrets to avoid repeated lookups
 _secrets_cache = {}
@@ -105,6 +140,10 @@ def get_config():
     try:
         get_secret("GEMINI_API_KEY")
         get_secret("FDA_API_KEY")
+        
+        google_oauth_configured = bool(os.environ.get("GOOGLE_OAUTH_CLIENT_ID"))
+        facebook_oauth_configured = bool(os.environ.get("FACEBOOK_APP_ID"))
+        
         return jsonify({
             "ready": True,
             "message": "Backend is configured and secrets are accessible",
@@ -112,7 +151,13 @@ def get_config():
                 "storage_available": is_gcloud_storage_available(),
                 "sql_available": is_gcloud_sql_available()
             },
-            "caching_enabled": is_gcloud_sql_available()
+            "caching_enabled": is_gcloud_sql_available(),
+            "auth": {
+                "enabled": AUTH_ENABLED,
+                "google_oauth": google_oauth_configured,
+                "facebook_oauth": facebook_oauth_configured,
+                "database_ready": is_gcloud_sql_available()
+            }
         }), 200
     except Exception as e:
         logger.error(f"Configuration check failed: {str(e)}")
@@ -123,8 +168,210 @@ def get_config():
                 "storage_available": is_gcloud_storage_available(),
                 "sql_available": is_gcloud_sql_available()
             },
-            "caching_enabled": is_gcloud_sql_available()
+            "caching_enabled": is_gcloud_sql_available(),
+            "auth": {
+                "enabled": AUTH_ENABLED,
+                "google_oauth": False,
+                "facebook_oauth": False,
+                "database_ready": is_gcloud_sql_available()
+            }
         }), 500
+
+
+# ============================================================
+# AUTHENTICATION ENDPOINTS
+# ============================================================
+
+@app.route("/api/auth/status", methods=["GET"])
+def auth_status():
+    """Check authentication status and configuration"""
+    return jsonify({
+        "auth_enabled": AUTH_ENABLED,
+        "google_oauth_configured": bool(os.environ.get("GOOGLE_OAUTH_CLIENT_ID")),
+        "facebook_oauth_configured": bool(os.environ.get("FACEBOOK_APP_ID")),
+        "database_ready": is_gcloud_sql_available()
+    }), 200
+
+
+@app.route("/api/auth/toggle", methods=["POST"])
+def toggle_auth():
+    """Toggle authentication on/off (admin function)"""
+    global AUTH_ENABLED
+    try:
+        data = request.get_json()
+        enabled = data.get("enabled", True)
+        AUTH_ENABLED = enabled
+        if AUTH_SERVICE:
+            AUTH_SERVICE.set_auth_enabled(enabled)
+        return jsonify({
+            "success": True,
+            "auth_enabled": AUTH_ENABLED
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/auth/register", methods=["POST"])
+def register():
+    """Register new user with email/password"""
+    if not AUTH_SERVICE:
+        return jsonify({"error": "Authentication service not available"}), 503
+    
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        password = data.get("password")
+        username = data.get("username")
+        
+        if not email or not password:
+            return jsonify({"error": "Email and password required"}), 400
+        
+        result = AUTH_SERVICE.register_email(email, password, username)
+        if result["success"]:
+            return jsonify(result), 201
+        return jsonify(result), 400
+    except Exception as e:
+        logger.error(f"Registration error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+    """Login with email/password"""
+    if not AUTH_SERVICE:
+        return jsonify({"error": "Authentication service not available"}), 503
+    
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        password = data.get("password")
+        
+        if not email or not password:
+            return jsonify({"error": "Email and password required"}), 400
+        
+        result = AUTH_SERVICE.login_email(email, password)
+        if result["success"]:
+            return jsonify(result), 200
+        return jsonify(result), 401
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/auth/google", methods=["GET"])
+def google_auth():
+    """Get Google OAuth authorization URL"""
+    if not AUTH_SERVICE:
+        return jsonify({"error": "Authentication service not available"}), 503
+    
+    redirect_uri = request.args.get("redirect_uri")
+    if not redirect_uri:
+        dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
+        redirect_uri = f"https://{dev_domain}/auth/google/callback" if dev_domain else None
+    
+    auth_url = AUTH_SERVICE.get_google_auth_url(redirect_uri)
+    if auth_url:
+        return jsonify({"auth_url": auth_url}), 200
+    return jsonify({"error": "Google OAuth not configured"}), 503
+
+
+@app.route("/api/auth/google/callback", methods=["POST"])
+def google_callback():
+    """Handle Google OAuth callback"""
+    if not AUTH_SERVICE:
+        return jsonify({"error": "Authentication service not available"}), 503
+    
+    try:
+        data = request.get_json()
+        code = data.get("code")
+        redirect_uri = data.get("redirect_uri")
+        
+        if not code:
+            return jsonify({"error": "Authorization code required"}), 400
+        
+        result = AUTH_SERVICE.login_google(code, redirect_uri)
+        if result["success"]:
+            return jsonify(result), 200
+        return jsonify(result), 401
+    except Exception as e:
+        logger.error(f"Google callback error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/auth/facebook/callback", methods=["POST"])
+def facebook_callback():
+    """Handle Facebook OAuth callback"""
+    if not AUTH_SERVICE:
+        return jsonify({"error": "Authentication service not available"}), 503
+    
+    try:
+        data = request.get_json()
+        access_token = data.get("access_token")
+        
+        if not access_token:
+            return jsonify({"error": "Access token required"}), 400
+        
+        result = AUTH_SERVICE.login_facebook(access_token)
+        if result["success"]:
+            return jsonify(result), 200
+        return jsonify(result), 401
+    except Exception as e:
+        logger.error(f"Facebook callback error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def logout():
+    """Logout user"""
+    if not AUTH_SERVICE:
+        return jsonify({"error": "Authentication service not available"}), 503
+    
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        AUTH_SERVICE.logout(token)
+    
+    return jsonify({"success": True}), 200
+
+
+@app.route("/api/auth/me", methods=["GET"])
+@require_auth
+def get_current_user():
+    """Get current user profile"""
+    return jsonify({
+        "success": True,
+        "user": request.current_user
+    }), 200
+
+
+@app.route("/api/auth/profile", methods=["PUT"])
+@require_auth
+def update_profile():
+    """Update user profile"""
+    if not AUTH_SERVICE:
+        return jsonify({"error": "Authentication service not available"}), 503
+    
+    try:
+        data = request.get_json()
+        user_id = request.current_user.get("id")
+        
+        result = AUTH_SERVICE.update_profile(user_id, data)
+        if result["success"]:
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        logger.error(f"Profile update error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/auth/users", methods=["GET"])
+def list_users():
+    """List all users (admin function)"""
+    if not AUTH_SERVICE:
+        return jsonify({"error": "Authentication service not available"}), 503
+    
+    users = AUTH_SERVICE.get_all_users()
+    return jsonify({"users": users}), 200
 
 
 @app.route("/api/analysis/cached", methods=["POST"])
