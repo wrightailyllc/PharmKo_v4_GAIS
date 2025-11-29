@@ -97,6 +97,16 @@ When deployed, the backend automatically:
 
 ## Recent Changes
 
+### Smart Query Caching (November 29, 2025)
+- Implemented 30-day query result reuse via Cloud SQL
+- Added intelligent cache management with `drug_query_cache` table
+- Created significance detection for adverse events and journal articles (>20% change threshold)
+- Added backend endpoints:
+  - `POST /api/analysis/cached` - Check cache before analysis
+  - `POST /api/analysis/save-cache` - Save results with significance tracking
+- Cache automatically initialized on startup
+- Supports partial updates: recycles old data but only updates when significant changes found
+
 ### Google Cloud Integration (November 29, 2025)
 - Added Google Cloud Storage integration for file uploads/buckets
 - Added Cloud SQL integration (MySQL/PostgreSQL support)

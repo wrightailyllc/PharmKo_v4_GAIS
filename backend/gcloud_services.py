@@ -6,7 +6,8 @@ import os
 import json
 import logging
 from typing import Optional, List, Dict, Any
-from datetime import timedelta
+from datetime import timedelta, datetime
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -462,6 +463,205 @@ def test_sql_connection() -> Dict[str, Any]:
             "connected": False,
             "error": str(e)
         }
+
+
+# ============================================================
+# QUERY CACHING (30-day reuse with significance detection)
+# ============================================================
+
+def initialize_cache_table() -> bool:
+    """Create the query cache table if it doesn't exist"""
+    try:
+        if not is_sql_configured():
+            logger.debug("Cloud SQL not configured - skipping cache table initialization")
+            return False
+        
+        engine = get_sql_engine()
+        create_table_query = """
+        CREATE TABLE IF NOT EXISTS drug_query_cache (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            drug_name VARCHAR(255) NOT NULL,
+            query_hash VARCHAR(64) NOT NULL UNIQUE,
+            cached_results JSON NOT NULL,
+            adverse_events_count INT DEFAULT 0,
+            journal_articles_count INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_drug_name (drug_name),
+            INDEX idx_created_at (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """
+        
+        with engine.connect() as conn:
+            import sqlalchemy
+            conn.execute(sqlalchemy.text(create_table_query))
+            conn.commit()
+            logger.info("Cache table initialized successfully")
+            return True
+    except Exception as e:
+        logger.error(f"Failed to initialize cache table: {e}")
+        return False
+
+
+def _compute_query_hash(drug_name: str) -> str:
+    """Compute SHA-256 hash of drug name for query identification"""
+    return hashlib.sha256(drug_name.lower().encode()).hexdigest()
+
+
+def get_cached_query(drug_name: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve cached query if available and recent (< 30 days).
+    Returns None if cache miss or expired.
+    """
+    try:
+        if not is_sql_configured():
+            return None
+        
+        query_hash = _compute_query_hash(drug_name)
+        engine = get_sql_engine()
+        
+        query = """
+        SELECT id, cached_results, adverse_events_count, journal_articles_count,
+               DATEDIFF(NOW(), created_at) as days_old
+        FROM drug_query_cache
+        WHERE query_hash = :hash
+        ORDER BY created_at DESC LIMIT 1
+        """
+        
+        with engine.connect() as conn:
+            import sqlalchemy
+            result = conn.execute(sqlalchemy.text(query), {"hash": query_hash})
+            row = result.fetchone()
+            
+            if not row:
+                logger.debug(f"Cache miss for: {drug_name}")
+                return None
+            
+            cache_id, results_json, adverse_count, articles_count, days_old = row
+            
+            if days_old > 30:
+                logger.debug(f"Cache expired (older than 30 days) for: {drug_name}")
+                return None
+            
+            cached_data = json.loads(results_json)
+            logger.info(f"Cache hit for {drug_name} (age: {days_old} days)")
+            
+            return {
+                "id": cache_id,
+                "results": cached_data,
+                "adverse_events_count": adverse_count,
+                "journal_articles_count": articles_count,
+                "days_old": days_old,
+                "cache_hit": True
+            }
+    except Exception as e:
+        logger.error(f"Error retrieving cache for {drug_name}: {e}")
+        return None
+
+
+def save_query_cache(
+    drug_name: str,
+    results: Dict[str, Any],
+    adverse_events_count: int = 0,
+    journal_articles_count: int = 0
+) -> bool:
+    """
+    Save or update cached query results.
+    """
+    try:
+        if not is_sql_configured():
+            return False
+        
+        query_hash = _compute_query_hash(drug_name)
+        results_json = json.dumps(results)
+        engine = get_sql_engine()
+        
+        upsert_query = """
+        INSERT INTO drug_query_cache (drug_name, query_hash, cached_results, adverse_events_count, journal_articles_count)
+        VALUES (:drug_name, :hash, :results, :adverse_count, :articles_count)
+        ON DUPLICATE KEY UPDATE
+            cached_results = :results,
+            adverse_events_count = :adverse_count,
+            journal_articles_count = :articles_count,
+            updated_at = NOW()
+        """
+        
+        with engine.connect() as conn:
+            import sqlalchemy
+            conn.execute(sqlalchemy.text(upsert_query), {
+                "drug_name": drug_name,
+                "hash": query_hash,
+                "results": results_json,
+                "adverse_count": adverse_events_count,
+                "articles_count": journal_articles_count
+            })
+            conn.commit()
+            logger.info(f"Cached query for {drug_name}")
+            return True
+    except Exception as e:
+        logger.error(f"Error saving cache for {drug_name}: {e}")
+        return False
+
+
+def detect_significant_changes(
+    old_results: Dict[str, Any],
+    new_results: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Detect significant changes between cached and new results.
+    Focus on adverse events and journal articles.
+    """
+    significance_report = {
+        "significant": False,
+        "changes": []
+    }
+    
+    try:
+        # Check adverse events changes
+        old_adverse = old_results.get("adverseEventsData", {})
+        new_adverse = new_results.get("adverseEventsData", {})
+        
+        old_adverse_count = len(old_adverse.get("events", []))
+        new_adverse_count = len(new_adverse.get("events", []))
+        adverse_change_pct = 0
+        
+        if old_adverse_count > 0:
+            adverse_change_pct = abs(new_adverse_count - old_adverse_count) / old_adverse_count * 100
+        
+        if adverse_change_pct > 20:  # More than 20% change
+            significance_report["significant"] = True
+            significance_report["changes"].append({
+                "type": "adverse_events",
+                "old_count": old_adverse_count,
+                "new_count": new_adverse_count,
+                "change_percent": adverse_change_pct
+            })
+        
+        # Check journal articles changes
+        old_articles = old_results.get("journalArticles", [])
+        new_articles = new_results.get("journalArticles", [])
+        
+        old_articles_count = len(old_articles)
+        new_articles_count = len(new_articles)
+        articles_change_pct = 0
+        
+        if old_articles_count > 0:
+            articles_change_pct = abs(new_articles_count - old_articles_count) / old_articles_count * 100
+        
+        if articles_change_pct > 20:  # More than 20% change
+            significance_report["significant"] = True
+            significance_report["changes"].append({
+                "type": "journal_articles",
+                "old_count": old_articles_count,
+                "new_count": new_articles_count,
+                "change_percent": articles_change_pct
+            })
+        
+        logger.info(f"Significance analysis: {significance_report}")
+        return significance_report
+    except Exception as e:
+        logger.error(f"Error detecting significant changes: {e}")
+        return {"significant": False, "error": str(e)}
 
 
 # ============================================================

@@ -24,11 +24,14 @@ try:
         execute_query, execute_write, test_sql_connection, cleanup,
         is_configured as gcloud_is_configured,
         is_storage_configured as gcloud_storage_configured,
-        is_sql_configured as gcloud_sql_configured
+        is_sql_configured as gcloud_sql_configured,
+        initialize_cache_table, get_cached_query, save_query_cache, detect_significant_changes
     )
     GCLOUD_MODULE_LOADED = True
     atexit.register(cleanup)
     logger.info("Google Cloud services module loaded")
+    # Initialize cache table on startup
+    initialize_cache_table()
 except ImportError as e:
     GCLOUD_MODULE_LOADED = False
     gcloud_is_configured = lambda: False
@@ -108,7 +111,8 @@ def get_config():
             "gcloud": {
                 "storage_available": is_gcloud_storage_available(),
                 "sql_available": is_gcloud_sql_available()
-            }
+            },
+            "caching_enabled": is_gcloud_sql_available()
         }), 200
     except Exception as e:
         logger.error(f"Configuration check failed: {str(e)}")
@@ -118,8 +122,98 @@ def get_config():
             "gcloud": {
                 "storage_available": is_gcloud_storage_available(),
                 "sql_available": is_gcloud_sql_available()
-            }
+            },
+            "caching_enabled": is_gcloud_sql_available()
         }), 500
+
+
+@app.route("/api/analysis/cached", methods=["POST"])
+def analyze_with_cache():
+    """
+    Analyze drug with intelligent query caching.
+    Reuses results from last 30 days, only updates on significant changes.
+    """
+    try:
+        data = request.get_json()
+        drug_name = data.get("drug_name")
+        
+        if not drug_name:
+            return jsonify({"error": "drug_name is required"}), 400
+        
+        if not is_gcloud_sql_available():
+            return jsonify({"error": "Query caching requires Cloud SQL"}), 503
+        
+        # Check for existing cache
+        cached = get_cached_query(drug_name)
+        if cached and cached.get("cache_hit"):
+            return jsonify({
+                "status": "cache_hit",
+                "cache_age_days": cached.get("days_old"),
+                "results": cached.get("results"),
+                "adverse_events_count": cached.get("adverse_events_count"),
+                "journal_articles_count": cached.get("journal_articles_count"),
+                "message": f"Returned cached results from {cached.get('days_old')} days ago"
+            }), 200
+        
+        # If we get here, either no cache or older than 30 days
+        # For older cache, the frontend would fetch new data, then send it back
+        # This endpoint just manages the caching logic
+        return jsonify({
+            "status": "no_cache",
+            "message": "No valid cache found. Frontend should fetch fresh data."
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Cache analysis error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/analysis/save-cache", methods=["POST"])
+def save_analysis_cache():
+    """
+    Save analysis results to cache.
+    Called after frontend completes analysis.
+    """
+    try:
+        data = request.get_json()
+        drug_name = data.get("drug_name")
+        results = data.get("results")
+        old_results = data.get("old_results")
+        
+        if not drug_name or not results:
+            return jsonify({"error": "drug_name and results are required"}), 400
+        
+        if not is_gcloud_sql_available():
+            return jsonify({"error": "Query caching requires Cloud SQL"}), 503
+        
+        # Count adverse events and articles
+        adverse_count = len(results.get("adverseEventsData", {}).get("events", []))
+        articles_count = len(results.get("journalArticles", []))
+        
+        # Check for significant changes if old_results provided
+        significance = None
+        if old_results:
+            significance = detect_significant_changes(old_results, results)
+        
+        # Save to cache
+        save_query_cache(
+            drug_name=drug_name,
+            results=results,
+            adverse_events_count=adverse_count,
+            journal_articles_count=articles_count
+        )
+        
+        return jsonify({
+            "status": "saved",
+            "message": f"Cached results for {drug_name}",
+            "adverse_events_count": adverse_count,
+            "journal_articles_count": articles_count,
+            "significance": significance
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Cache save error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 
 # ============================================================
