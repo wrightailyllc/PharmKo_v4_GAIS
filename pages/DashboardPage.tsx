@@ -12,7 +12,11 @@ import html2canvas from 'html2canvas';
 
 type View = 'report' | 'sources';
 
-export const DashboardPage: React.FC = () => {
+interface DashboardPageProps {
+  onViewPrivacy?: () => void;
+}
+
+export const DashboardPage: React.FC<DashboardPageProps> = ({ onViewPrivacy }) => {
   const [drugName, setDrugName] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
@@ -114,7 +118,7 @@ export const DashboardPage: React.FC = () => {
           
           <div ref={reportRef}>
             <div data-view="report" style={{ display: currentView === 'report' ? 'block' : 'none' }}>
-              <ReportDisplay result={analysisResult} drugName={drugName} />
+              <ReportDisplay result={analysisResult} drugName={drugName} onViewPrivacy={onViewPrivacy} />
             </div>
             <div data-view="sources" style={{ display: currentView === 'sources' ? 'block' : 'none' }}>
               <SourceDataViewer sourceData={sourceData} drugName={drugName} />

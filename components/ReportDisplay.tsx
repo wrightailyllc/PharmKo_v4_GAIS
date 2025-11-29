@@ -16,6 +16,7 @@ import ReactMarkdown from 'react-markdown';
 interface ReportDisplayProps {
   result: AnalysisResult;
   drugName: string;
+  onViewPrivacy?: () => void;
 }
 
 const PIE_CHART_COLORS = ['#4f46e5', '#7c3aed', '#db2777', '#f97316', '#eab308', '#10b981', '#6b7280'];
@@ -75,7 +76,7 @@ const ScoreBreakdownItem: React.FC<ScoreBreakdownItemProps> = ({ label, score, w
 };
 
 
-export const ReportDisplay: React.FC<ReportDisplayProps> = ({ result, drugName }) => {
+export const ReportDisplay: React.FC<ReportDisplayProps> = ({ result, drugName, onViewPrivacy }) => {
 
   const chartData = result.adverseEffectsProfile.pieChartData.map((item, index) => ({
     name: item.name,
@@ -245,14 +246,12 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({ result, drugName }
           <p className="text-sm text-gray-400">
               This report is for informational purposes only and does not constitute medical or legal advice. Consult with qualified professionals.
           </p>
-          <a
-              href="https://www.privacypolicygenerator.info/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-indigo-400 hover:underline mt-2 inline-block"
+          <button
+              onClick={onViewPrivacy}
+              className="text-sm text-indigo-400 hover:underline mt-2 inline-block bg-none border-none cursor-pointer"
           >
               View Full Terms of Service & Privacy Policy
-          </a>
+          </button>
       </ReportSection>
     </div>
   );
