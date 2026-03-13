@@ -1,64 +1,14 @@
 /**
- * Secret Manager Service
- * 
- * This service fetches API keys from the backend instead of storing them client-side.
- * The backend retrieves secrets from Replit Secrets.
+ * Backend Health/Config Service
+ *
+ * Provides health and configuration checks for the backend.
+ * Secret fetching has been removed -- all keyed API calls now go through
+ * server-side proxy routes (/api/proxy/*) that inject keys automatically.
  */
-
-// Cache for fetched secrets to avoid repeated API calls
-const secretsCache: { [key: string]: string } = {};
-
-// Use relative URLs in development (Vite proxy) and production (same origin)
-// - In dev: Vite proxy forwards /api to http://localhost:8000
-// - In prod: Backend serves both static files and API on same origin
-const BACKEND_URL = "";
-
-async function fetchSecret(secretName: string): Promise<string> {
-  // Return from cache if available
-  if (secretsCache[secretName]) {
-    return secretsCache[secretName];
-  }
-
-  try {
-    const response = await fetch(
-      `${BACKEND_URL}/api/secrets/${secretName}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch secret: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (data.api_key) {
-      // Cache the secret
-      secretsCache[secretName] = data.api_key;
-      return data.api_key;
-    } else {
-      throw new Error("No API key returned from backend");
-    }
-  } catch (error) {
-    console.error(`Error fetching secret ${secretName}:`, error);
-    throw error;
-  }
-}
-
-export async function getGeminiApiKey(): Promise<string> {
-  return fetchSecret("gemini-key");
-}
-
-export async function getFdaApiKey(): Promise<string> {
-  return fetchSecret("fda-key");
-}
 
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/health`);
+    const response = await fetch('/api/health');
     return response.ok;
   } catch (error) {
     console.error("Backend health check failed:", error);
@@ -68,7 +18,7 @@ export async function checkBackendHealth(): Promise<boolean> {
 
 export async function checkBackendConfig(): Promise<boolean> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/config`);
+    const response = await fetch('/api/config');
     if (!response.ok) return false;
     const data = await response.json();
     return data.ready === true;

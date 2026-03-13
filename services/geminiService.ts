@@ -1,11 +1,6 @@
 // services/geminiService.ts
 
-import { GoogleGenAI, Type } from "@google/genai";
 import type { AnalysisResult, SourceData } from '../types';
-import { getGeminiApiKey, getFdaApiKey } from './secretManager';
-
-let ai: GoogleGenAI | null = null;
-let cachedFdaApiKey: string | null = null;
 
 // --- Scoring System Constants ---
 const SCORING_WEIGHTS = {
@@ -262,18 +257,17 @@ const fetchRxNormData = async (drugName: string) => {
 };
 
 const fetchFdaData = async (drugName: string, activeIngredient: string) => {
-  const fdaApiKey = await getFdaApiKey();
-  const fdaApiBase = 'https://api.fda.gov/drug';
-  const addApiKey = (url: string) => fdaApiKey ? `${url}&api_key=${fdaApiKey}` : url;
+  const fdaProxyBase = '/api/proxy/fda/drug';
 
   // Build a more robust query that searches brand name, generic name, and substance name.
   // This is more likely to find results if one of the fields doesn't match perfectly.
   const labelSearchQuery = `(openfda.brand_name:"${encodeURIComponent(drugName)}" OR openfda.generic_name:"${encodeURIComponent(drugName)}" OR openfda.substance_name:"${encodeURIComponent(activeIngredient)}")`;
   const eventSearchQuery = `(patient.drug.openfda.brand_name:"${encodeURIComponent(drugName)}" OR patient.drug.openfda.generic_name:"${encodeURIComponent(drugName)}" OR patient.drug.openfda.substance_name:"${encodeURIComponent(activeIngredient)}")`;
 
-  const labelUrl = addApiKey(`${fdaApiBase}/label.json?search=${labelSearchQuery}&limit=1`);
-  const totalEventsUrl = addApiKey(`${fdaApiBase}/event.json?search=${eventSearchQuery}&count=safetyreportid.exact&limit=0`);
-  const topReactionsUrl = addApiKey(`${fdaApiBase}/event.json?search=${eventSearchQuery}&count=patient.reaction.reactionmeddrapt.exact&limit=50`);
+  // No api_key parameter needed -- the proxy injects it server-side
+  const labelUrl = `${fdaProxyBase}/label.json?search=${labelSearchQuery}&limit=1`;
+  const totalEventsUrl = `${fdaProxyBase}/event.json?search=${eventSearchQuery}&count=safetyreportid.exact&limit=0`;
+  const topReactionsUrl = `${fdaProxyBase}/event.json?search=${eventSearchQuery}&count=patient.reaction.reactionmeddrapt.exact&limit=50`;
 
   const [fdaLabel, adverseEventsTotal, adverseEventsReactions] = await Promise.all([
     fetchApi(labelUrl, 'FDA Label API returned an error'),
@@ -389,66 +383,66 @@ export const analyzeDrugSafety = async (
   `;
 
   const analysisResultSchema = {
-    type: Type.OBJECT,
+    type: "OBJECT",
     properties: {
         drugLabelAnalysis: {
-            type: Type.OBJECT,
+            type: "OBJECT",
             properties: {
-                summary: { type: Type.STRING },
-                blackBoxWarning: { type: Type.STRING },
-                activeIngredient: { type: Type.STRING },
-                otherDrugsWithActiveIngredient: { type: Type.ARRAY, items: { type: Type.STRING } },
+                summary: { type: "STRING" },
+                blackBoxWarning: { type: "STRING" },
+                activeIngredient: { type: "STRING" },
+                otherDrugsWithActiveIngredient: { type: "ARRAY", items: { type: "STRING" } },
             },
             required: ["summary", "blackBoxWarning", "activeIngredient", "otherDrugsWithActiveIngredient"],
         },
         clinicalTrialAnalysis: {
-            type: Type.OBJECT,
+            type: "OBJECT",
             properties: {
-                summary: { type: Type.STRING },
-                highestPhase: { type: Type.STRING },
-                conditionsStudied: { type: Type.ARRAY, items: { type: Type.STRING } },
+                summary: { type: "STRING" },
+                highestPhase: { type: "STRING" },
+                conditionsStudied: { type: "ARRAY", items: { type: "STRING" } },
             },
             required: ["summary", "highestPhase", "conditionsStudied"],
         },
         adverseEffectsProfile: {
-            type: Type.OBJECT,
+            type: "OBJECT",
             properties: {
-                summary: { type: Type.STRING },
-                totalEvents: { type: Type.NUMBER },
+                summary: { type: "STRING" },
+                totalEvents: { type: "NUMBER" },
                 pieChartData: {
-                    type: Type.ARRAY,
+                    type: "ARRAY",
                     items: {
-                        type: Type.OBJECT,
-                        properties: { name: { type: Type.STRING }, value: { type: Type.NUMBER } },
+                        type: "OBJECT",
+                        properties: { name: { type: "STRING" }, value: { type: "NUMBER" } },
                         required: ["name", "value"],
                     },
                 },
-                top5Events: { type: Type.ARRAY, items: { type: Type.STRING } },
+                top5Events: { type: "ARRAY", items: { type: "STRING" } },
             },
             required: ["summary", "totalEvents", "pieChartData", "top5Events"],
         },
         journalAnalysis: {
-            type: Type.OBJECT,
+            type: "OBJECT",
             properties: {
-                summary: { type: Type.STRING },
-                keyFindings: { type: Type.ARRAY, items: { type: Type.STRING } },
-                articlesReviewed: { type: Type.NUMBER },
-                paywalledArticles: { type: Type.NUMBER },
+                summary: { type: "STRING" },
+                keyFindings: { type: "ARRAY", items: { type: "STRING" } },
+                articlesReviewed: { type: "NUMBER" },
+                paywalledArticles: { type: "NUMBER" },
             },
             required: ["summary", "keyFindings", "articlesReviewed", "paywalledArticles"],
         },
         drugInteractions: {
-            type: Type.OBJECT,
+            type: "OBJECT",
             properties: {
-                summary: { type: Type.STRING },
+                summary: { type: "STRING" },
                 interactions: {
-                    type: Type.ARRAY,
+                    type: "ARRAY",
                     items: {
-                        type: Type.OBJECT,
+                        type: "OBJECT",
                         properties: {
-                            substance: { type: Type.STRING },
-                            effect: { type: Type.STRING },
-                            severity: { type: Type.STRING },
+                            substance: { type: "STRING" },
+                            effect: { type: "STRING" },
+                            severity: { type: "STRING" },
                         },
                         required: ["substance", "effect", "severity"],
                     },
@@ -457,19 +451,19 @@ export const analyzeDrugSafety = async (
             required: ["summary", "interactions"],
         },
         potentialHarmScore: {
-            type: Type.OBJECT,
+            type: "OBJECT",
             properties: {
-                summary: { type: Type.STRING },
+                summary: { type: "STRING" },
             },
             required: ["summary"],
         },
         citations: {
-            type: Type.ARRAY,
+            type: "ARRAY",
             items: {
-                type: Type.OBJECT,
+                type: "OBJECT",
                 properties: {
-                    source: { type: Type.STRING },
-                    details: { type: Type.STRING },
+                    source: { type: "STRING" },
+                    details: { type: "STRING" },
                 },
                 required: ["source", "details"],
             },
@@ -478,25 +472,26 @@ export const analyzeDrugSafety = async (
     required: ["drugLabelAnalysis", "clinicalTrialAnalysis", "adverseEffectsProfile", "journalAnalysis", "drugInteractions", "potentialHarmScore", "citations"],
   };
 
-  // Initialize Gemini AI client with the API key from Secret Manager
-  if (!ai) {
-    const geminiApiKey = await getGeminiApiKey();
-    ai = new GoogleGenAI({ apiKey: geminiApiKey });
-  }
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: analysisResultSchema,
-      temperature: 0.1,
-    },
+  // Call Gemini via server-side proxy (keys injected on the backend)
+  const proxyResponse = await fetch('/api/proxy/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt: prompt,
+      response_schema: analysisResultSchema,
+    }),
   });
 
+  if (!proxyResponse.ok) {
+    const errorData = await proxyResponse.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Analysis temporarily unavailable');
+  }
+
+  const geminiResponse = await proxyResponse.json();
+
   updateLog('✓ AI analysis complete.');
-  
-  const jsonText = (response.text || '').trim();
+
+  const jsonText = (geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   const aiResult = JSON.parse(jsonText);
   
   // Calculate the harm score programmatically using the weighted scoring system
