@@ -46,11 +46,11 @@ Plans:
   2. Visiting /api/auth/toggle or /api/auth/users without authentication returns 401/403
   3. The /api/gcloud/sql/query endpoint is either removed or returns 401/403 for non-admin users
   4. CORS headers only allow requests from the app's own origin, not wildcard (*)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md -- Backend security: API proxy routes, CORS config, admin auth decorator, endpoint protection
+- [ ] 02-02-PLAN.md -- Frontend refactor: use proxy routes instead of direct API calls, verify no keys in browser
 
 ### Phase 3: Safety Score Card & Compliance
 **Goal**: Users see a clear, color-coded safety verdict at a glance and are informed this is not medical advice
