@@ -1,5 +1,5 @@
 """
-Flask backend for PharmKo - handles API secrets securely via Replit Secrets
+Flask backend for PharmKo - handles API secrets securely via environment variables
 Includes Google Cloud Storage, Cloud SQL integration, and User Authentication
 """
 import os
@@ -268,8 +268,8 @@ def google_auth():
     
     redirect_uri = request.args.get("redirect_uri")
     if not redirect_uri:
-        dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
-        redirect_uri = f"https://{dev_domain}/auth/google/callback" if dev_domain else None
+        # Use the request's own host (works on Cloud Run, local dev, any domain)
+        redirect_uri = f"{request.scheme}://{request.host}/auth/google/callback"
     
     auth_url = AUTH_SERVICE.get_google_auth_url(redirect_uri)
     if auth_url:
