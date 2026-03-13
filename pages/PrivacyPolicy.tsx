@@ -1,19 +1,22 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { SEOHead } from '../components/SEOHead';
 
-interface PrivacyPolicyProps {
-  onBack: () => void;
-}
-
-export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
+export const PrivacyPolicy: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 py-12 px-4">
+      <SEOHead
+        title="Privacy Policy | PharmKo"
+        description="PharmKo privacy policy - how we collect, use, and protect your data."
+        path="/privacy"
+      />
       <div className="max-w-4xl mx-auto">
-        <button 
-          onClick={onBack}
+        <Link
+          to="/"
           className="text-indigo-400 hover:text-indigo-300 flex items-center gap-2 mb-6"
         >
           ← Back
-        </button>
+        </Link>
 
         <article className="space-y-8">
           <header>

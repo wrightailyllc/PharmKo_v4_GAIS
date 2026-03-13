@@ -89,3 +89,34 @@ export interface SourceData {
   europePmcArticles?: any;
   apiUrls?: Record<string, string>;
 }
+
+// Proprietary KPI Types
+
+export interface ConfidenceScore {
+  overall: number; // 0-100
+  dataCompleteness: number; // 0-100, 25pts per data source
+  dataRecency: number; // 0-100
+  sourceAgreement: number; // 0-100
+  level: 'high' | 'medium' | 'low';
+}
+
+export interface SafetyTrendIndicator {
+  direction: 'improving' | 'stable' | 'worsening' | 'unknown';
+  recentEventsTrend: number; // % change
+  newWarningsAdded: boolean;
+  clinicalTrialActivity: 'active' | 'completed' | 'none';
+  description: string;
+}
+
+export interface EngagementMetrics {
+  totalSearches: number;
+  uniqueDrugsSearched: number;
+  reportsDownloaded: number;
+  savedReports: number;
+}
+
+export interface PharmKoKPIs {
+  harmScore: PotentialHarmScore;
+  confidenceScore: ConfidenceScore;
+  safetyTrend: SafetyTrendIndicator;
+}

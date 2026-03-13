@@ -2,26 +2,66 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PharmKo</title>
-    
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
-    "html2canvas": "https://aistudiocdn.com/html2canvas@^1.4.1",
-    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.3",
-    "react-markdown": "https://aistudiocdn.com/react-markdown@^10.1.0",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "vite": "https://aistudiocdn.com/vite@^7.2.4"
-  }
-}
-</script>
-</head>
+    <title>PharmKo - AI-Powered Drug Safety Intelligence</title>
+    <meta name="description" content="PharmKo provides AI-powered drug safety reports using FDA data, clinical trials, and medical research. Search any medication for adverse events, interactions, and harm scores." />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="canonical" href="https://pharmko.app/" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="PharmKo - AI-Powered Drug Safety Intelligence" />
+    <meta property="og:description" content="Search any medication for AI-powered safety reports with FDA adverse events, drug interactions, clinical trials, and harm scores." />
+    <meta property="og:url" content="https://pharmko.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PharmKo" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PharmKo - AI-Powered Drug Safety Intelligence" />
+    <meta name="twitter:description" content="Search any medication for AI-powered safety reports with FDA adverse events, drug interactions, clinical trials, and harm scores." />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <!-- Google Search Console verification (replace with actual code) -->
+    <!-- <meta name="google-site-verification" content="YOUR_VERIFICATION_CODE" /> -->
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "PharmKo",
+      "url": "https://pharmko.app",
+      "applicationCategory": "HealthApplication",
+      "operatingSystem": "Web, iOS, Android",
+      "description": "AI-powered pharmacological intelligence providing drug safety reports, adverse event analysis, drug interaction checking, and harm scoring using FDA, PubMed, and clinical trial data.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "creator": {
+        "@type": "Organization",
+        "name": "WrightAI, LLC",
+        "url": "https://pharmko.app"
+      },
+      "featureList": [
+        "Drug Safety Reports",
+        "FDA Adverse Event Analysis",
+        "Drug Interaction Checker",
+        "Clinical Trial Data",
+        "AI-Powered Harm Scoring",
+        "Medical Journal Synthesis"
+      ]
+    }
+    </script>
+  </head>
   <body class="bg-gray-900">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

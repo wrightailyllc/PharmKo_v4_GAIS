@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import type { AnalysisResult } from '../types';
 import { ReportSection } from './ReportSection';
 import { PillIcon } from './icons/PillIcon';
@@ -8,7 +9,6 @@ import { LightBulbIcon } from './icons/LightBulbIcon';
 import { BeakerIcon } from './icons/BeakerIcon';
 import { ClipboardDocumentListIcon } from './icons/ClipboardDocumentListIcon';
 import { LockClosedIcon } from './icons/LockClosedIcon';
-// FIX: Import the missing DocumentTextIcon component.
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { PieChart } from './PieChart';
 import ReactMarkdown from 'react-markdown';
@@ -16,7 +16,6 @@ import ReactMarkdown from 'react-markdown';
 interface ReportDisplayProps {
   result: AnalysisResult;
   drugName: string;
-  onViewPrivacy?: () => void;
 }
 
 const PIE_CHART_COLORS = ['#4f46e5', '#7c3aed', '#db2777', '#f97316', '#eab308', '#10b981', '#6b7280'];
@@ -76,7 +75,7 @@ const ScoreBreakdownItem: React.FC<ScoreBreakdownItemProps> = ({ label, score, w
 };
 
 
-export const ReportDisplay: React.FC<ReportDisplayProps> = ({ result, drugName, onViewPrivacy }) => {
+export const ReportDisplay: React.FC<ReportDisplayProps> = ({ result, drugName }) => {
 
   const chartData = result.adverseEffectsProfile.pieChartData.map((item, index) => ({
     name: item.name,
@@ -246,12 +245,19 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({ result, drugName, 
           <p className="text-sm text-gray-400">
               This report is for informational purposes only and does not constitute medical or legal advice. Consult with qualified professionals.
           </p>
-          <button
-              onClick={onViewPrivacy}
-              className="text-sm text-indigo-400 hover:underline mt-2 inline-block bg-none border-none cursor-pointer"
+          <Link
+              to="/privacy"
+              className="text-sm text-indigo-400 hover:underline mt-2 inline-block"
           >
-              View Full Terms of Service & Privacy Policy
-          </button>
+              View Full Privacy Policy
+          </Link>
+          {' | '}
+          <Link
+              to="/terms"
+              className="text-sm text-indigo-400 hover:underline mt-2 inline-block"
+          >
+              Terms of Service
+          </Link>
       </ReportSection>
     </div>
   );
