@@ -268,8 +268,9 @@ def google_auth():
     
     redirect_uri = request.args.get("redirect_uri")
     if not redirect_uri:
-        # Use the request's own host (works on Cloud Run, local dev, any domain)
-        redirect_uri = f"{request.scheme}://{request.host}/auth/google/callback"
+        # Use X-Forwarded-Proto on Cloud Run (TLS terminated at load balancer)
+        scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
+        redirect_uri = f"{scheme}://{request.host}/auth/google/callback"
     
     auth_url = AUTH_SERVICE.get_google_auth_url(redirect_uri)
     if auth_url:
