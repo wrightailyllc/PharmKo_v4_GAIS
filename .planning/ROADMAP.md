@@ -30,12 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. All 32 secrets are injected via Cloud Run --set-secrets and accessible to the application at runtime
   4. Cloud SQL queries, authentication (email/password + Google/Facebook OAuth), and caching all work in the deployed app
   5. OAuth login redirects correctly to the Cloud Run URL (not the old Replit domain)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md -- Fix backend code and Dockerfile for Cloud Run (ADC, PostgreSQL DDL, OAuth redirect)
+- [ ] 01-02-PLAN.md -- Rewrite Cloud Build pipeline for Artifact Registry + secret injection, create GCP setup script
+- [ ] 01-03-PLAN.md -- Deploy, verify all services, update OAuth provider consoles
 
 ### Phase 2: Security Hardening
 **Goal**: No API keys, admin endpoints, or database queries are exploitable by unauthenticated users
