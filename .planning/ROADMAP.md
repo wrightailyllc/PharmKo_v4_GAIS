@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [ ] 01-01-PLAN.md -- Fix backend code and Dockerfile for Cloud Run (ADC, PostgreSQL DDL, OAuth redirect)
-- [ ] 01-02-PLAN.md -- Rewrite Cloud Build pipeline for Artifact Registry + secret injection, create GCP setup script
+- [x] 01-02-PLAN.md -- Rewrite Cloud Build pipeline for Artifact Registry + secret injection, create GCP setup script
 - [ ] 01-03-PLAN.md -- Deploy, verify all services, update OAuth provider consoles
 
 ### Phase 2: Security Hardening
@@ -101,7 +101,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. GCP Foundation & Deployment | 0/3 | Not started | - |
+| 1. GCP Foundation & Deployment | 1/3 | In Progress | - |
 | 2. Security Hardening | 0/2 | Not started | - |
 | 3. Safety Score Card & Compliance | 0/2 | Not started | - |
 | 4. Shareable Drug Pages | 0/1 | Not started | - |

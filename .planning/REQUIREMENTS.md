@@ -9,11 +9,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: Cloud Run deployment uses Artifact Registry (us-central1-docker.pkg.dev) instead of deprecated gcr.io
-- [ ] **INFRA-02**: Cloud Run service uses dedicated pharmko-cloudrun-sa service account with least-privilege IAM roles
-- [ ] **INFRA-03**: All secrets injected via Cloud Run native --set-secrets from existing Secret Manager secrets
+- [x] **INFRA-01**: Cloud Run deployment uses Artifact Registry (us-central1-docker.pkg.dev) instead of deprecated gcr.io
+- [x] **INFRA-02**: Cloud Run service uses dedicated pharmko-cloudrun-sa service account with least-privilege IAM roles
+- [x] **INFRA-03**: All secrets injected via Cloud Run native --set-secrets from existing Secret Manager secrets
 - [ ] **INFRA-04**: Dockerfile copies all backend modules (main.py, gcloud_services.py, auth_service.py) so Cloud SQL, auth, and caching work in production
-- [ ] **INFRA-05**: cloudbuild.yaml updated for Artifact Registry image references and --set-secrets deployment
+- [x] **INFRA-05**: cloudbuild.yaml updated for Artifact Registry image references and --set-secrets deployment
 - [ ] **INFRA-06**: OAuth redirect URIs updated from Replit domain to Cloud Run URL
 
 ### Security
@@ -76,11 +76,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
-| INFRA-03 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
+| INFRA-03 | Phase 1 | Complete |
 | INFRA-04 | Phase 1 | Pending |
-| INFRA-05 | Phase 1 | Pending |
+| INFRA-05 | Phase 1 | Complete |
 | INFRA-06 | Phase 1 | Pending |
 | SEC-01 | Phase 2 | Pending |
 | SEC-02 | Phase 2 | Pending |
