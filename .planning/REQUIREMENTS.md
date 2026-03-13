@@ -18,10 +18,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Security
 
-- [ ] **SEC-01**: API key endpoints (/api/secrets/*) removed or moved to server-side proxy pattern so keys are never exposed to browser
-- [ ] **SEC-02**: Admin endpoints (/api/auth/toggle, /api/auth/users) require authentication
-- [ ] **SEC-03**: Open SQL query endpoint (/api/gcloud/sql/query) removed or restricted to authenticated admin only
-- [ ] **SEC-04**: CORS restricted from wildcard (*) to specific allowed origins
+- [x] **SEC-01**: API key endpoints (/api/secrets/*) removed or moved to server-side proxy pattern so keys are never exposed to browser
+- [x] **SEC-02**: Admin endpoints (/api/auth/toggle, /api/auth/users) require authentication
+- [x] **SEC-03**: Open SQL query endpoint (/api/gcloud/sql/query) removed or restricted to authenticated admin only
+- [x] **SEC-04**: CORS restricted from wildcard (*) to specific allowed origins
 - [ ] **SEC-05**: Prominent medical disclaimer ("not medical advice") displayed on all drug analysis pages
 
 ### Visual Polish
@@ -82,10 +82,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-04 | Phase 1 | Complete |
 | INFRA-05 | Phase 1 | Complete |
 | INFRA-06 | Phase 1 | Complete |
-| SEC-01 | Phase 2 | Pending |
-| SEC-02 | Phase 2 | Pending |
-| SEC-03 | Phase 2 | Pending |
-| SEC-04 | Phase 2 | Pending |
+| SEC-01 | Phase 2 | Complete |
+| SEC-02 | Phase 2 | Complete |
+| SEC-03 | Phase 2 | Complete |
+| SEC-04 | Phase 2 | Complete |
 | SEC-05 | Phase 3 | Pending |
 | UI-01 | Phase 3 | Pending |
 | SHARE-01 | Phase 4 | Pending |

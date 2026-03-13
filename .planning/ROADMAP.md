@@ -49,7 +49,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Backend security: API proxy routes, CORS config, admin auth decorator, endpoint protection
+- [x] 02-01-PLAN.md -- Backend security: API proxy routes, CORS config, admin auth decorator, endpoint protection
 - [ ] 02-02-PLAN.md -- Frontend refactor: use proxy routes instead of direct API calls, verify no keys in browser
 
 ### Phase 3: Safety Score Card & Compliance
@@ -102,7 +102,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. GCP Foundation & Deployment | 1/3 | In Progress | - |
-| 2. Security Hardening | 0/2 | Not started | - |
+| 2. Security Hardening | 1/2 | In Progress | - |
 | 3. Safety Score Card & Compliance | 0/2 | Not started | - |
 | 4. Shareable Drug Pages | 0/1 | Not started | - |
 | 5. Engagement Features | 0/2 | Not started | - |

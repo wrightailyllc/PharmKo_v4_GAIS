@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-03-13T22:24:41.227Z"
+status: executing
+last_updated: "2026-03-13T23:12:25Z"
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
 ---
 
 # Project State
@@ -18,33 +18,34 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-12)
 
 **Core value:** A worried patient can search any drug and immediately understand its safety profile through a clear, visual score card
-**Current focus:** Phase 1: GCP Foundation & Deployment
+**Current focus:** Phase 2: Security Hardening
 
 ## Current Position
 
-Phase: 1 of 5 (GCP Foundation & Deployment)
-Plan: 3 of 3 in current phase
+Phase: 2 of 5 (Security Hardening)
+Plan: 1 of 2 in current phase
 Status: Executing
-Last activity: 2026-03-12 -- Completed 01-01-PLAN.md
+Last activity: 2026-03-13 -- Completed 02-01-PLAN.md
 
-Progress: [###.......] 30%
+Progress: [####......] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
+- Total plans completed: 3
 - Average duration: 3min
-- Total execution time: 0.1 hours
+- Total execution time: 0.2 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-gcp-foundation-deployment | 2 | 6min | 3min |
+| 02-security-hardening | 1 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4min), 01-02 (2min)
-- Trend: Starting
+- Last 5 plans: 01-01 (4min), 01-02 (2min), 02-01 (2min)
+- Trend: Consistent
 
 *Updated after each plan completion*
 
@@ -63,6 +64,10 @@ Recent decisions affecting current work:
 - [01-01]: request.scheme + request.host for OAuth redirect, removing all Replit-specific code
 - [01-02]: 8 secrets mapped via --set-secrets (app-referenced only); remaining 24 secrets in Secret Manager not used by code
 - [01-02]: Cloud SQL db-f1-micro + HDD for cost minimization; setup script omits passwords for security
+- [02-01]: 403 for non-admin access (honest error, not security through obscurity) per CONTEXT.md
+- [02-01]: LIMIT 1000 auto-appended to SQL queries missing explicit LIMIT to prevent table dumps
+- [02-01]: ADMIN_EMAIL placeholder in cloudbuild.yaml requires developer update before deploy
+- [02-01]: Proxy routes return user-friendly 503 error messages with no raw details
 
 ### Pending Todos
 
@@ -75,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-12
-Stopped at: Completed 01-01-PLAN.md (Cloud Run backend fixes)
+Last session: 2026-03-13
+Stopped at: Completed 02-01-PLAN.md (Security hardening backend)
 Resume file: None
