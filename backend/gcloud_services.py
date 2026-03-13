@@ -44,27 +44,21 @@ def _get_credentials():
         logger.info(f"Loaded credentials from file: {creds_file}")
         return _credentials
     else:
-        raise ValueError(
-            "Google Cloud credentials not found. Set GOOGLE_APPLICATION_CREDENTIALS_JSON "
-            "(JSON string) or GOOGLE_APPLICATION_CREDENTIALS (file path)"
-        )
+        import google.auth
+        _credentials, _ = google.auth.default()
+        logger.info("Loaded credentials via Application Default Credentials (ADC)")
+
+    return _credentials
 
 
 def is_storage_configured() -> bool:
     """Check if Google Cloud Storage is properly configured"""
     try:
-        creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-        creds_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        
-        if not (creds_json or (creds_file and os.path.exists(creds_file))):
-            logger.debug("No Google Cloud credentials configured")
-            return False
-        
         bucket_name = os.environ.get("GCS_BUCKET_NAME")
         if not bucket_name:
             logger.debug("GCS_BUCKET_NAME not set - storage not available")
             return False
-        
+        _get_credentials()  # Will succeed on Cloud Run via ADC
         return True
     except Exception as e:
         logger.error(f"Storage configuration check failed: {e}")
@@ -74,21 +68,14 @@ def is_storage_configured() -> bool:
 def is_sql_configured() -> bool:
     """Check if Google Cloud SQL is properly configured"""
     try:
-        creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-        creds_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        
-        if not (creds_json or (creds_file and os.path.exists(creds_file))):
-            return False
-        
         instance = os.environ.get("CLOUD_SQL_INSTANCE")
         user = os.environ.get("CLOUD_SQL_USER")
         password = os.environ.get("CLOUD_SQL_PASSWORD")
         database = os.environ.get("CLOUD_SQL_DATABASE")
-        
         if not all([instance, user, password, database]):
             logger.debug("Cloud SQL not fully configured - missing required env vars")
             return False
-        
+        _get_credentials()  # Will succeed on Cloud Run via ADC
         return True
     except Exception as e:
         logger.error(f"SQL configuration check failed: {e}")
@@ -367,7 +354,7 @@ def get_sql_engine():
     db_user = os.environ.get("CLOUD_SQL_USER")
     db_pass = os.environ.get("CLOUD_SQL_PASSWORD")
     db_name = os.environ.get("CLOUD_SQL_DATABASE")
-    db_type = os.environ.get("CLOUD_SQL_TYPE", "mysql").lower()
+    db_type = os.environ.get("CLOUD_SQL_TYPE", "postgresql").lower()
     
     if not all([db_user, db_pass, db_name]):
         raise ValueError("CLOUD_SQL_USER, CLOUD_SQL_PASSWORD, and CLOUD_SQL_DATABASE must be set")
@@ -479,22 +466,28 @@ def initialize_cache_table() -> bool:
         engine = get_sql_engine()
         create_table_query = """
         CREATE TABLE IF NOT EXISTS drug_query_cache (
-            id INT AUTO_INCREMENT PRIMARY KEY,
+            id SERIAL PRIMARY KEY,
             drug_name VARCHAR(255) NOT NULL,
             query_hash VARCHAR(64) NOT NULL UNIQUE,
-            cached_results JSON NOT NULL,
+            cached_results JSONB NOT NULL,
             adverse_events_count INT DEFAULT 0,
             journal_articles_count INT DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX idx_drug_name (drug_name),
-            INDEX idx_created_at (created_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        create_index_drug = """
+        CREATE INDEX IF NOT EXISTS idx_drug_name ON drug_query_cache (drug_name)
+        """
+        create_index_created = """
+        CREATE INDEX IF NOT EXISTS idx_created_at ON drug_query_cache (created_at)
         """
         
         with engine.connect() as conn:
             import sqlalchemy
             conn.execute(sqlalchemy.text(create_table_query))
+            conn.execute(sqlalchemy.text(create_index_drug))
+            conn.execute(sqlalchemy.text(create_index_created))
             conn.commit()
             logger.info("Cache table initialized successfully")
             return True
@@ -522,7 +515,7 @@ def get_cached_query(drug_name: str) -> Optional[Dict[str, Any]]:
         
         query = """
         SELECT id, cached_results, adverse_events_count, journal_articles_count,
-               DATEDIFF(NOW(), created_at) as days_old
+               EXTRACT(DAY FROM AGE(NOW(), created_at)) as days_old
         FROM drug_query_cache
         WHERE query_hash = :hash
         ORDER BY created_at DESC LIMIT 1
@@ -579,11 +572,11 @@ def save_query_cache(
         upsert_query = """
         INSERT INTO drug_query_cache (drug_name, query_hash, cached_results, adverse_events_count, journal_articles_count)
         VALUES (:drug_name, :hash, :results, :adverse_count, :articles_count)
-        ON DUPLICATE KEY UPDATE
-            cached_results = :results,
-            adverse_events_count = :adverse_count,
-            journal_articles_count = :articles_count,
-            updated_at = NOW()
+        ON CONFLICT (query_hash) DO UPDATE SET
+            cached_results = EXCLUDED.cached_results,
+            adverse_events_count = EXCLUDED.adverse_events_count,
+            journal_articles_count = EXCLUDED.journal_articles_count,
+            updated_at = CURRENT_TIMESTAMP
         """
         
         with engine.connect() as conn:
