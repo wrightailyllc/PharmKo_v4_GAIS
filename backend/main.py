@@ -56,6 +56,7 @@ def is_gcloud_sql_available():
 # Import Authentication service
 AUTH_SERVICE = None
 AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "true").lower() == "true"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip().lower()
 
 try:
     from auth_service import get_auth_service, initialize_auth
@@ -86,6 +87,33 @@ def require_auth(f):
         
         return f(*args, **kwargs)
     return decorated_function
+
+def require_admin(f):
+    """Decorator to require admin authentication for endpoints.
+    Checks Bearer token + verifies user email matches ADMIN_EMAIL."""
+    @wraps(f)
+    def decorated_admin(*args, **kwargs):
+        if not ADMIN_EMAIL:
+            return jsonify({"error": "Admin access not configured"}), 403
+
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({"error": "Authentication required"}), 401
+
+        token = auth_header.split(' ')[1]
+        if not AUTH_SERVICE:
+            return jsonify({"error": "Authentication required"}), 401
+
+        user = AUTH_SERVICE.get_user_by_session(token)
+        if not user:
+            return jsonify({"error": "Invalid or expired session"}), 401
+
+        if user.get("email", "").lower() != ADMIN_EMAIL:
+            return jsonify({"error": "Admin access required"}), 403
+
+        request.current_user = user
+        return f(*args, **kwargs)
+    return decorated_admin
 
 # Cache for secrets to avoid repeated lookups
 _secrets_cache = {}
@@ -236,6 +264,7 @@ def auth_status():
 
 
 @app.route("/api/auth/toggle", methods=["POST"])
+@require_admin
 def toggle_auth():
     """Toggle authentication on/off (admin function)"""
     global AUTH_ENABLED
@@ -439,6 +468,7 @@ def update_profile():
 
 
 @app.route("/api/auth/users", methods=["GET"])
+@require_admin
 def list_users():
     """List all users (admin function)"""
     if not AUTH_SERVICE:
@@ -664,22 +694,28 @@ def gcloud_sql_test():
 
 
 @app.route("/api/gcloud/sql/query", methods=["POST"])
+@require_admin
 def gcloud_sql_query():
-    """Execute a SELECT query on Cloud SQL"""
+    """Execute a SELECT query on Cloud SQL (admin only, read-only)"""
     if not is_gcloud_sql_available():
         return jsonify({"error": "Google Cloud SQL not configured"}), 503
-    
+
     try:
         data = request.get_json()
         if not data or 'query' not in data:
             return jsonify({"error": "Query required"}), 400
-        
+
         query = data['query']
         params = data.get('params', {})
-        
+
+        # Block write operations
         if any(kw in query.upper() for kw in ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'TRUNCATE', 'ALTER']):
             return jsonify({"error": "Only SELECT queries allowed via this endpoint"}), 403
-        
+
+        # Enforce result size limit to prevent accidental table dumps
+        if 'LIMIT' not in query.upper():
+            query = query.rstrip(';') + ' LIMIT 1000'
+
         results = execute_query(query, params)
         return jsonify({
             "success": True,
