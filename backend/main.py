@@ -15,7 +15,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder=None)
-CORS(app, supports_credentials=True)
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5000,http://localhost:5173").split(",")
+CORS(app, supports_credentials=True, origins=ALLOWED_ORIGINS)
 
 # Import Google Cloud services (optional - only if configured)
 try:
@@ -112,26 +113,65 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 
-@app.route("/api/secrets/gemini-key", methods=["GET"])
-def get_gemini_key():
-    """Get Gemini API key from environment"""
+# ============================================================
+# API PROXY ROUTES (server-side key injection)
+# ============================================================
+
+@app.route("/api/proxy/analyze", methods=["POST"])
+def proxy_gemini_analyze():
+    """Proxy Gemini API calls — injects API key server-side so it never reaches the browser"""
     try:
+        import requests as http_requests
+
+        data = request.get_json()
+        if not data or "prompt" not in data:
+            return jsonify({"error": "prompt is required"}), 400
+
+        prompt = data["prompt"]
+        response_schema = data.get("response_schema")
+
         api_key = get_secret("GEMINI_API_KEY")
-        return jsonify({"api_key": api_key}), 200
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+
+        generation_config = {
+            "responseMimeType": "application/json",
+            "temperature": 0.1,
+        }
+        if response_schema:
+            generation_config["responseSchema"] = response_schema
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": generation_config,
+        }
+
+        resp = http_requests.post(url, json=payload, timeout=120)
+        resp.raise_for_status()
+        return jsonify(resp.json()), 200
     except Exception as e:
-        logger.error(f"Error retrieving Gemini key: {str(e)}")
-        return jsonify({"error": "Failed to retrieve API key"}), 500
+        logger.error(f"Gemini proxy error: {e}")
+        return jsonify({"error": "Analysis temporarily unavailable"}), 503
 
 
-@app.route("/api/secrets/fda-key", methods=["GET"])
-def get_fda_key():
-    """Get FDA API key from environment"""
+@app.route("/api/proxy/fda/<path:fda_path>", methods=["GET"])
+def proxy_fda(fda_path):
+    """Proxy FDA API calls — injects API key server-side so it never reaches the browser"""
     try:
-        api_key = get_secret("FDA_API_KEY")
-        return jsonify({"api_key": api_key}), 200
+        import requests as http_requests
+
+        fda_key = get_secret("FDA_API_KEY")
+
+        # Forward all original query parameters and inject the API key
+        params = dict(request.args)
+        params["api_key"] = fda_key
+
+        fda_url = f"https://api.fda.gov/{fda_path}"
+        resp = http_requests.get(fda_url, params=params, timeout=30)
+        resp.raise_for_status()
+        return jsonify(resp.json()), 200
     except Exception as e:
-        logger.error(f"Error retrieving FDA key: {str(e)}")
-        return jsonify({"error": "Failed to retrieve API key"}), 500
+        logger.error(f"FDA proxy error: {e}")
+        return jsonify({"error": "FDA data temporarily unavailable"}), 503
 
 
 @app.route("/api/config", methods=["GET"])
