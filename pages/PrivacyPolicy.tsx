@@ -21,8 +21,15 @@ export const PrivacyPolicy: React.FC = () => {
         <article className="space-y-8">
           <header>
             <h1 className="text-4xl font-bold text-white mb-2">PharmKo Privacy Policy</h1>
-            <p className="text-gray-400">Effective Date: November 28, 2025</p>
+            <p className="text-gray-400">Effective Date: May 3, 2026</p>
           </header>
+
+          <section>
+            <h2 className="text-2xl font-bold text-white mb-4">MEDICAL DISCLAIMER</h2>
+            <p className="text-gray-300 mb-4">
+              PharmKo is an informational tool that aggregates publicly available drug data from the U.S. FDA, ClinicalTrials.gov, RxNorm, Europe PMC, and other government and academic sources, and synthesizes that data using AI. PharmKo does <strong>not</strong> provide medical advice, diagnosis, or treatment, and is <strong>not</strong> a substitute for the professional judgment of a licensed healthcare provider. Never disregard medical advice or delay seeking it because of something you read on PharmKo. In an emergency, call 911 or your local emergency number.
+            </p>
+          </section>
 
           <section>
             <h2 className="text-2xl font-bold text-white mb-4">1. INTRODUCTION</h2>
@@ -57,19 +64,18 @@ export const PrivacyPolicy: React.FC = () => {
           <section>
             <h2 className="text-2xl font-bold text-white mb-4">2. PERSONAL DATA WE COLLECT</h2>
             
-            <h3 className="text-xl font-bold text-white mb-3">When You Make a Purchase or Use Our Services</h3>
+            <h3 className="text-xl font-bold text-white mb-3">When You Use Our Services</h3>
             <p className="text-gray-300 mb-3">We collect the following types of Personal Data:</p>
             <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4 mb-4">
-              <li>Account Information: name, email address, password</li>
-              <li>Payment Information: billing address, phone number, credit/debit card, payment methods</li>
-              <li>Financial Information: credit card numbers</li>
-              <li>Purchase Information</li>
-              <li>Mobile device identifiers: make, model, IMEI, phone number</li>
-              <li>Location Data</li>
-              <li>Feedback: customer support inquiries, product reviews</li>
-              <li>Social Media Information</li>
-              <li>Product Information: serial numbers, registration, licensing</li>
+              <li>Account Information: name, email address, password (hashed)</li>
+              <li>Authentication Tokens: when you sign in with Google or Facebook OAuth</li>
+              <li>Search Queries: drug names you search, used to generate your safety reports</li>
+              <li>Generated Reports: AI-synthesized drug analyses tied to your account</li>
+              <li>Subscription Status: if you purchase a paid tier (processed via Stripe on web; via Apple In-App Purchase on iOS; via Google Play Billing on Android)</li>
+              <li>Device & Usage Data: browser type, OS, app version, IP address, session timing — for security and reliability</li>
+              <li>Customer Support Communications: messages you send to our support email</li>
             </ul>
+            <p className="text-gray-300 mb-3">We do <strong>not</strong> collect: precise location, contacts, photos, microphone, camera, health records, or any data classified as Protected Health Information (PHI) under HIPAA. PharmKo is not a covered entity under HIPAA and does not store medical records.</p>
 
             <h3 className="text-xl font-bold text-white mb-3">How We Collect Your Data</h3>
             <p className="text-gray-300 mb-3"><strong>From You:</strong> When you create an account, purchase products, use our services, create content, download software, subscribe to newsletters, complete surveys, or contact us.</p>
@@ -95,15 +101,17 @@ export const PrivacyPolicy: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold text-white mb-4">4. THIRD PARTY TOOLS</h2>
-            <p className="text-gray-300 mb-3">We use the following third-party tools to store and manage your information:</p>
+            <h2 className="text-2xl font-bold text-white mb-4">4. THIRD-PARTY SERVICES</h2>
+            <p className="text-gray-300 mb-3">PharmKo uses the following third-party services. Each is listed with the data they receive and the purpose:</p>
             <ul className="list-disc list-inside space-y-2 text-gray-300 ml-4">
-              <li>Shopify - e-commerce platform</li>
-              <li>Hubspot - CRM and marketing automation</li>
-              <li>Intercom - customer communication</li>
-              <li>Segment - data collection and analytics</li>
-              <li>Stripe - payment processing</li>
-              <li>Google Cloud - storage and database services</li>
+              <li><strong>Google Cloud Platform</strong> — hosts the application and database (Cloud Run, Cloud SQL, Cloud Storage, Secret Manager). Receives: all account data and usage data.</li>
+              <li><strong>Google Gemini API</strong> — generates AI-powered drug safety analyses. Receives: drug names you search and the publicly available drug data we send for synthesis. Does <strong>not</strong> receive your account identity.</li>
+              <li><strong>U.S. FDA openFDA</strong> — public API for drug labels and adverse events. Receives: only the drug name being queried.</li>
+              <li><strong>ClinicalTrials.gov, RxNorm (NLM), Europe PMC</strong> — public APIs for clinical trials and journal articles. Receive: only the drug name being queried.</li>
+              <li><strong>Google Sign-In and Facebook Login</strong> (optional) — used only if you choose OAuth sign-in. We receive your name, email, and OAuth identifier; we do not access your social graph or post on your behalf.</li>
+              <li><strong>Stripe</strong> (web only) — payment processing for paid tiers when accessed from the website. Stripe receives card data directly; PharmKo never sees your card number. PharmKo only receives subscription status.</li>
+              <li><strong>Apple In-App Purchase</strong> (iOS app) — payment processing for paid tiers on iOS. Apple receives card data directly. PharmKo only receives subscription status via App Store Server API.</li>
+              <li><strong>Google Play Billing</strong> (Android app) — payment processing for paid tiers on Android. Google receives card data directly. PharmKo only receives subscription status via Play Developer API.</li>
             </ul>
           </section>
 
