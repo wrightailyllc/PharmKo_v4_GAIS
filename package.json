@@ -11,8 +11,10 @@
     "test-secrets": "bash test-secrets.sh"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.1",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
+    "@capacitor/ios": "^8.3.1",
     "@google/genai": "^1.27.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.3",
