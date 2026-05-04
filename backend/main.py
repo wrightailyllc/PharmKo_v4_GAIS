@@ -88,9 +88,17 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated_function
 
+_ADMIN_OAUTH_PROVIDERS = {"google", "facebook"}
+
 def require_admin(f):
-    """Decorator to require admin authentication for endpoints.
-    Checks Bearer token + verifies user email matches ADMIN_EMAIL."""
+    """Require admin authentication: bearer session whose user is the
+    designated ADMIN_EMAIL AND was authenticated via a trusted OAuth
+    provider with a verified email and a non-empty oauth_id.
+
+    Email-string equality alone is not enough: the email column is
+    user-claimable via /api/auth/register, so admin must be bound to
+    a provider-issued identity (oauth_id) that an attacker cannot mint.
+    """
     @wraps(f)
     def decorated_admin(*args, **kwargs):
         if not ADMIN_EMAIL:
@@ -109,6 +117,15 @@ def require_admin(f):
             return jsonify({"error": "Invalid or expired session"}), 401
 
         if user.get("email", "").lower() != ADMIN_EMAIL:
+            return jsonify({"error": "Admin access required"}), 403
+
+        if user.get("auth_provider") not in _ADMIN_OAUTH_PROVIDERS:
+            return jsonify({"error": "Admin access required"}), 403
+
+        if not user.get("oauth_id"):
+            return jsonify({"error": "Admin access required"}), 403
+
+        if not user.get("email_verified"):
             return jsonify({"error": "Admin access required"}), 403
 
         request.current_user = user
@@ -145,9 +162,24 @@ def health_check():
 # API PROXY ROUTES (server-side key injection)
 # ============================================================
 
+def _safe_proxy_log(label: str, exc: Exception) -> None:
+    """Log a proxy error WITHOUT stringifying the exception, because
+    requests.HTTPError stringifies to include the full request URL,
+    and our request URLs may carry API keys as query parameters."""
+    resp = getattr(exc, "response", None)
+    status = getattr(resp, "status_code", None)
+    reason = getattr(resp, "reason", None)
+    if status is not None:
+        logger.error("%s upstream error: status=%s reason=%s", label, status, reason)
+    else:
+        logger.error("%s error: %s", label, type(exc).__name__)
+
+
 @app.route("/api/proxy/analyze", methods=["POST"])
 def proxy_gemini_analyze():
-    """Proxy Gemini API calls — injects API key server-side so it never reaches the browser"""
+    """Proxy Gemini API calls — injects API key server-side so it never reaches the browser.
+    The API key is sent in the x-goog-api-key header, never in the URL, so it cannot
+    leak via requests.HTTPError stringification of response.url."""
     try:
         import requests as http_requests
 
@@ -159,7 +191,7 @@ def proxy_gemini_analyze():
         response_schema = data.get("response_schema")
 
         api_key = get_secret("GEMINI_API_KEY")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
         generation_config = {
             "responseMimeType": "application/json",
@@ -173,17 +205,24 @@ def proxy_gemini_analyze():
             "generationConfig": generation_config,
         }
 
-        resp = http_requests.post(url, json=payload, timeout=120)
+        resp = http_requests.post(
+            url,
+            json=payload,
+            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            timeout=120,
+        )
         resp.raise_for_status()
         return jsonify(resp.json()), 200
     except Exception as e:
-        logger.error(f"Gemini proxy error: {e}")
+        _safe_proxy_log("Gemini proxy", e)
         return jsonify({"error": "Analysis temporarily unavailable"}), 503
 
 
 @app.route("/api/proxy/fda/<path:fda_path>", methods=["GET"])
 def proxy_fda(fda_path):
-    """Proxy FDA API calls — injects API key server-side so it never reaches the browser"""
+    """Proxy FDA API calls — injects API key server-side so it never reaches the browser.
+    The API key is sent in the Authorization-style query param required by openFDA, but
+    on errors we never stringify the exception (which would expose response.url)."""
     try:
         import requests as http_requests
 
@@ -198,7 +237,7 @@ def proxy_fda(fda_path):
         resp.raise_for_status()
         return jsonify(resp.json()), 200
     except Exception as e:
-        logger.error(f"FDA proxy error: {e}")
+        _safe_proxy_log("FDA proxy", e)
         return jsonify({"error": "FDA data temporarily unavailable"}), 503
 
 
