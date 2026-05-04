@@ -89,10 +89,19 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({ result, drugName }
         <h2 className="text-3xl font-bold text-white">
           AI-Powered Safety Report for <span className="text-indigo-400">{drugName}</span>
         </h2>
-        <p className="mt-2 text-gray-400">
-          This report is AI-generated and for informational purposes only. It is not a substitute for professional medical advice.
-        </p>
       </header>
+
+      <div role="alert" aria-label="Medical disclaimer" className="p-4 bg-amber-900/30 border-l-4 border-amber-500 rounded-md">
+        <div className="flex items-start gap-3">
+          <ShieldExclamationIcon className="h-6 w-6 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-bold text-amber-200">Not medical advice.</p>
+            <p className="text-amber-100/90 mt-1">
+              This AI-generated report is for educational and informational purposes only. It is <strong>not</strong> a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider before starting, stopping, or changing any medication. In an emergency, call 911 or your local emergency services.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Drug Label Analysis */}
       <ReportSection title="Drug Label Analysis" icon={<PillIcon />}>
