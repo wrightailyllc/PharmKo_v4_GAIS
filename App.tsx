@@ -10,22 +10,9 @@ import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
 import { ProfileForm } from './components/ProfileForm';
 import type { UserProfile, AuthConfig } from './types/auth';
+import { BACKEND_BASE_URL } from './config';
 
-const getBackendUrl = () => {
-  if (import.meta.env.PROD) {
-    return '';
-  }
-
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    return `${protocol}//${hostname}:8000`;
-  }
-
-  return 'http://localhost:8000';
-};
-
-const BACKEND_URL = getBackendUrl();
+const BACKEND_URL = BACKEND_BASE_URL;
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);

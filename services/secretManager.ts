@@ -6,9 +6,11 @@
  * server-side proxy routes (/api/proxy/*) that inject keys automatically.
  */
 
+import { BACKEND_BASE_URL } from '../config';
+
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const response = await fetch('/api/health');
+    const response = await fetch(`${BACKEND_BASE_URL}/api/health`);
     return response.ok;
   } catch (error) {
     console.error("Backend health check failed:", error);
@@ -18,7 +20,7 @@ export async function checkBackendHealth(): Promise<boolean> {
 
 export async function checkBackendConfig(): Promise<boolean> {
   try {
-    const response = await fetch('/api/config');
+    const response = await fetch(`${BACKEND_BASE_URL}/api/config`);
     if (!response.ok) return false;
     const data = await response.json();
     return data.ready === true;

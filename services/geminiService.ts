@@ -1,6 +1,7 @@
 // services/geminiService.ts
 
 import type { AnalysisResult, SourceData } from '../types';
+import { config } from '../config';
 
 // --- Scoring System Constants ---
 const SCORING_WEIGHTS = {
@@ -257,7 +258,7 @@ const fetchRxNormData = async (drugName: string) => {
 };
 
 const fetchFdaData = async (drugName: string, activeIngredient: string) => {
-  const fdaProxyBase = '/api/proxy/fda/drug';
+  const fdaProxyBase = config.apiEndpoints.fdaProxy;
 
   // Build a more robust query that searches brand name, generic name, and substance name.
   // This is more likely to find results if one of the fields doesn't match perfectly.
@@ -473,7 +474,7 @@ export const analyzeDrugSafety = async (
   };
 
   // Call Gemini via server-side proxy (keys injected on the backend)
-  const proxyResponse = await fetch('/api/proxy/analyze', {
+  const proxyResponse = await fetch(config.apiEndpoints.geminiProxy, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
