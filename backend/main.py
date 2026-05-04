@@ -1,5 +1,5 @@
 """
-Flask backend for PharmKo - handles API secrets securely via Replit Secrets
+Flask backend for PharmKo - handles API secrets securely via environment variables
 Includes Google Cloud Storage, Cloud SQL integration, and User Authentication
 """
 import os
@@ -15,7 +15,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder=None)
-CORS(app, supports_credentials=True)
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5000,http://localhost:5173").split(",")
+CORS(app, supports_credentials=True, origins=ALLOWED_ORIGINS)
 
 # Import Google Cloud services (optional - only if configured)
 try:
@@ -55,6 +56,7 @@ def is_gcloud_sql_available():
 # Import Authentication service
 AUTH_SERVICE = None
 AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "true").lower() == "true"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip().lower()
 
 try:
     from auth_service import get_auth_service, initialize_auth
@@ -86,6 +88,50 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated_function
 
+_ADMIN_OAUTH_PROVIDERS = {"google", "facebook"}
+
+def require_admin(f):
+    """Require admin authentication: bearer session whose user is the
+    designated ADMIN_EMAIL AND was authenticated via a trusted OAuth
+    provider with a verified email and a non-empty oauth_id.
+
+    Email-string equality alone is not enough: the email column is
+    user-claimable via /api/auth/register, so admin must be bound to
+    a provider-issued identity (oauth_id) that an attacker cannot mint.
+    """
+    @wraps(f)
+    def decorated_admin(*args, **kwargs):
+        if not ADMIN_EMAIL:
+            return jsonify({"error": "Admin access not configured"}), 403
+
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({"error": "Authentication required"}), 401
+
+        token = auth_header.split(' ')[1]
+        if not AUTH_SERVICE:
+            return jsonify({"error": "Authentication required"}), 401
+
+        user = AUTH_SERVICE.get_user_by_session(token)
+        if not user:
+            return jsonify({"error": "Invalid or expired session"}), 401
+
+        if user.get("email", "").lower() != ADMIN_EMAIL:
+            return jsonify({"error": "Admin access required"}), 403
+
+        if user.get("auth_provider") not in _ADMIN_OAUTH_PROVIDERS:
+            return jsonify({"error": "Admin access required"}), 403
+
+        if not user.get("oauth_id"):
+            return jsonify({"error": "Admin access required"}), 403
+
+        if not user.get("email_verified"):
+            return jsonify({"error": "Admin access required"}), 403
+
+        request.current_user = user
+        return f(*args, **kwargs)
+    return decorated_admin
+
 # Cache for secrets to avoid repeated lookups
 _secrets_cache = {}
 
@@ -112,26 +158,87 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 
-@app.route("/api/secrets/gemini-key", methods=["GET"])
-def get_gemini_key():
-    """Get Gemini API key from environment"""
+# ============================================================
+# API PROXY ROUTES (server-side key injection)
+# ============================================================
+
+def _safe_proxy_log(label: str, exc: Exception) -> None:
+    """Log a proxy error WITHOUT stringifying the exception, because
+    requests.HTTPError stringifies to include the full request URL,
+    and our request URLs may carry API keys as query parameters."""
+    resp = getattr(exc, "response", None)
+    status = getattr(resp, "status_code", None)
+    reason = getattr(resp, "reason", None)
+    if status is not None:
+        logger.error("%s upstream error: status=%s reason=%s", label, status, reason)
+    else:
+        logger.error("%s error: %s", label, type(exc).__name__)
+
+
+@app.route("/api/proxy/analyze", methods=["POST"])
+def proxy_gemini_analyze():
+    """Proxy Gemini API calls — injects API key server-side so it never reaches the browser.
+    The API key is sent in the x-goog-api-key header, never in the URL, so it cannot
+    leak via requests.HTTPError stringification of response.url."""
     try:
+        import requests as http_requests
+
+        data = request.get_json()
+        if not data or "prompt" not in data:
+            return jsonify({"error": "prompt is required"}), 400
+
+        prompt = data["prompt"]
+        response_schema = data.get("response_schema")
+
         api_key = get_secret("GEMINI_API_KEY")
-        return jsonify({"api_key": api_key}), 200
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+
+        generation_config = {
+            "responseMimeType": "application/json",
+            "temperature": 0.1,
+        }
+        if response_schema:
+            generation_config["responseSchema"] = response_schema
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": generation_config,
+        }
+
+        resp = http_requests.post(
+            url,
+            json=payload,
+            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        return jsonify(resp.json()), 200
     except Exception as e:
-        logger.error(f"Error retrieving Gemini key: {str(e)}")
-        return jsonify({"error": "Failed to retrieve API key"}), 500
+        _safe_proxy_log("Gemini proxy", e)
+        return jsonify({"error": "Analysis temporarily unavailable"}), 503
 
 
-@app.route("/api/secrets/fda-key", methods=["GET"])
-def get_fda_key():
-    """Get FDA API key from environment"""
+@app.route("/api/proxy/fda/<path:fda_path>", methods=["GET"])
+def proxy_fda(fda_path):
+    """Proxy FDA API calls — injects API key server-side so it never reaches the browser.
+    The API key is sent in the Authorization-style query param required by openFDA, but
+    on errors we never stringify the exception (which would expose response.url)."""
     try:
-        api_key = get_secret("FDA_API_KEY")
-        return jsonify({"api_key": api_key}), 200
+        import requests as http_requests
+
+        fda_key = get_secret("FDA_API_KEY")
+
+        # Forward all original query parameters and inject the API key
+        params = dict(request.args)
+        params["api_key"] = fda_key
+
+        fda_url = f"https://api.fda.gov/{fda_path}"
+        resp = http_requests.get(fda_url, params=params, timeout=30)
+        resp.raise_for_status()
+        return jsonify(resp.json()), 200
     except Exception as e:
-        logger.error(f"Error retrieving FDA key: {str(e)}")
-        return jsonify({"error": "Failed to retrieve API key"}), 500
+        _safe_proxy_log("FDA proxy", e)
+        return jsonify({"error": "FDA data temporarily unavailable"}), 503
 
 
 @app.route("/api/config", methods=["GET"])
@@ -196,6 +303,7 @@ def auth_status():
 
 
 @app.route("/api/auth/toggle", methods=["POST"])
+@require_admin
 def toggle_auth():
     """Toggle authentication on/off (admin function)"""
     global AUTH_ENABLED
@@ -268,8 +376,9 @@ def google_auth():
     
     redirect_uri = request.args.get("redirect_uri")
     if not redirect_uri:
-        dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
-        redirect_uri = f"https://{dev_domain}/auth/google/callback" if dev_domain else None
+        # Use X-Forwarded-Proto on Cloud Run (TLS terminated at load balancer)
+        scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
+        redirect_uri = f"{scheme}://{request.host}/auth/google/callback"
     
     auth_url = AUTH_SERVICE.get_google_auth_url(redirect_uri)
     if auth_url:
@@ -398,6 +507,7 @@ def update_profile():
 
 
 @app.route("/api/auth/users", methods=["GET"])
+@require_admin
 def list_users():
     """List all users (admin function)"""
     if not AUTH_SERVICE:
@@ -623,22 +733,28 @@ def gcloud_sql_test():
 
 
 @app.route("/api/gcloud/sql/query", methods=["POST"])
+@require_admin
 def gcloud_sql_query():
-    """Execute a SELECT query on Cloud SQL"""
+    """Execute a SELECT query on Cloud SQL (admin only, read-only)"""
     if not is_gcloud_sql_available():
         return jsonify({"error": "Google Cloud SQL not configured"}), 503
-    
+
     try:
         data = request.get_json()
         if not data or 'query' not in data:
             return jsonify({"error": "Query required"}), 400
-        
+
         query = data['query']
         params = data.get('params', {})
-        
+
+        # Block write operations
         if any(kw in query.upper() for kw in ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'TRUNCATE', 'ALTER']):
             return jsonify({"error": "Only SELECT queries allowed via this endpoint"}), 403
-        
+
+        # Enforce result size limit to prevent accidental table dumps
+        if 'LIMIT' not in query.upper():
+            query = query.rstrip(';') + ' LIMIT 1000'
+
         results = execute_query(query, params)
         return jsonify({
             "success": True,

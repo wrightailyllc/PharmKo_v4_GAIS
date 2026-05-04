@@ -37,3 +37,35 @@ ENV/
 # Environment variables
 .env
 .env.local
+
+# Claude Code local settings
+.claude/
+
+# Capacitor iOS — commit source, ignore build artifacts
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+ios/App/output/
+ios/App/Podfile.lock
+
+# Capacitor Android — commit source, ignore build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.idea/
+android/*.iml
+
+# Code signing material — never commit
+*.keystore
+*.jks
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist

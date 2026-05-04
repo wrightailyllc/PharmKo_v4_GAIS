@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PharmKoLogoIcon } from './icons/PharmKoLogoIcon';
 import { LogoutIcon } from './icons/LogoutIcon';
 
@@ -26,12 +27,12 @@ export const Header: React.FC<HeaderProps> = ({ isAuthenticated, onLogout, user,
   return (
     <header className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-10">
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-4">
+        <Link to="/" className="flex items-center gap-4 hover:opacity-90 transition-opacity">
           <PharmKoLogoIcon className="h-9 w-auto" />
           <h1 className="text-3xl font-bold text-white tracking-tight">
             PharmKo
           </h1>
-        </div>
+        </Link>
         {isAuthenticated && (
           <div className="relative">
             <button

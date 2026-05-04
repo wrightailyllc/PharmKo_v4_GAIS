@@ -1,0 +1,20 @@
+{
+  "name": "PharmKo - Drug Safety Intelligence",
+  "short_name": "PharmKo",
+  "description": "AI-powered drug safety analysis and pharmacovigilance reports. Search any medication for FDA adverse events, interactions, and harm scores.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "categories": ["health", "medical"],
+  "icons": [
+    { "src": "/icons/icon-48.webp",  "sizes": "48x48",   "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-72.webp",  "sizes": "72x72",   "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-96.webp",  "sizes": "96x96",   "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-128.webp", "sizes": "128x128", "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-192.webp", "sizes": "192x192", "type": "image/webp", "purpose": "any maskable" },
+    { "src": "/icons/icon-256.webp", "sizes": "256x256", "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-512.webp", "sizes": "512x512", "type": "image/webp", "purpose": "any maskable" }
+  ]
+}

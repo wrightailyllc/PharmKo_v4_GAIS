@@ -1,0 +1,21 @@
+<svg width="2732" height="2732" viewBox="0 0 2732 2732" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+  <rect width="2732" height="2732" fill="url(#bg)"/>
+  <g transform="translate(1166, 1066)">
+    <path
+      d="M200,0 C332.84,0 400,134.315 400,300 C400,465.685 332.84,600 200,600 C67.16,600 0,465.685 0,300 C0,134.315 67.16,0 200,0 Z"
+      fill="#003D66"
+    />
+    <g fill="#F26A69">
+      <circle cx="200" cy="190" r="65"/>
+      <rect x="100" y="290" width="200" height="170" rx="100"/>
+    </g>
+  </g>
+  <text x="1366" y="1900" font-family="-apple-system, system-ui, sans-serif" font-size="160" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="-2">PharmKo</text>
+  <text x="1366" y="1990" font-family="-apple-system, system-ui, sans-serif" font-size="50" font-weight="400" fill="#9ca3af" text-anchor="middle">Drug Safety Intelligence</text>
+</svg>

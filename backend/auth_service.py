@@ -105,7 +105,15 @@ class AuthService:
         """Register a new user with email/password"""
         if not self.is_sql_configured():
             return {"success": False, "error": "Database not configured"}
-        
+
+        # Block email/password registration of the designated admin email.
+        # Admin must come in via OAuth (provider-issued oauth_id), otherwise
+        # any internet user could pre-register the admin address and gain
+        # admin powers via require_admin email-string match.
+        admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+        if admin_email and email.strip().lower() == admin_email:
+            return {"success": False, "error": "This email cannot be registered with a password. Use Sign in with Google."}
+
         try:
             existing = self.execute_query(
                 "SELECT id FROM users WHERE email = :email",
@@ -306,19 +314,29 @@ class AuthService:
             
             if existing:
                 user = existing[0]
+                # When an OAuth login resolves to an existing row, take ownership:
+                # set auth_provider/oauth_id to the OAuth identity and clear any
+                # password material. This evicts a squatter who pre-registered
+                # the email via the email/password path (an admin-takeover vector
+                # where require_admin authorizes by email string equality).
                 self.execute_write(
-                    """UPDATE users SET 
+                    """UPDATE users SET
                        first_name = COALESCE(:first_name, first_name),
                        last_name = COALESCE(:last_name, last_name),
                        profile_picture_url = COALESCE(:profile_picture, profile_picture_url),
                        city = COALESCE(:city, city),
                        state = COALESCE(:state, state),
                        email_verified = :email_verified,
+                       auth_provider = :provider,
+                       oauth_id = :oauth_id,
+                       password_hash = NULL,
+                       password_salt = NULL,
                        last_login = CURRENT_TIMESTAMP,
                        updated_at = CURRENT_TIMESTAMP
                        WHERE id = :user_id""",
-                    {"first_name": first_name, "last_name": last_name, "profile_picture": profile_picture, 
-                     "city": city, "state": state, "email_verified": email_verified, "user_id": user['id']}
+                    {"first_name": first_name, "last_name": last_name, "profile_picture": profile_picture,
+                     "city": city, "state": state, "email_verified": email_verified,
+                     "provider": provider, "oauth_id": oauth_id, "user_id": user['id']}
                 )
                 user_id = user['id']
             else:
@@ -443,13 +461,13 @@ class AuthService:
                 return None
             
             user = self.execute_query(
-                """SELECT id, email, username, first_name, last_name, city, state, 
-                          zip_code, birth_year, current_medications, profile_complete, 
-                          profile_picture_url, auth_provider
+                """SELECT id, email, username, first_name, last_name, city, state,
+                          zip_code, birth_year, current_medications, profile_complete,
+                          profile_picture_url, auth_provider, oauth_id, email_verified
                    FROM users WHERE id = :user_id""",
                 {"user_id": session[0]['user_id']}
             )
-            
+
             return user[0] if user else None
         except Exception as e:
             logger.error(f"Session lookup failed: {e}")

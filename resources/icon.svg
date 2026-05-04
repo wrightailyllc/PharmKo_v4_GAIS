@@ -1,0 +1,21 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#003D66"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="180" fill="url(#bg)"/>
+  <g transform="translate(312, 192)">
+    <path
+      d="M200,0 C332.84,0 400,134.315 400,300 C400,465.685 332.84,600 200,600 C67.16,600 0,465.685 0,300 C0,134.315 67.16,0 200,0 Z"
+      fill="#003D66"
+      opacity="0.4"
+    />
+    <g fill="#F26A69">
+      <circle cx="200" cy="190" r="65"/>
+      <rect x="100" y="290" width="200" height="170" rx="100"/>
+    </g>
+  </g>
+  <text x="512" y="900" font-family="-apple-system, system-ui, sans-serif" font-size="120" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="-2">PharmKo</text>
+</svg>

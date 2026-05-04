@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { DrugInputForm } from '../components/DrugInputForm';
 import { AnalysisProgress } from '../components/AnalysisProgress';
 import { ReportDisplay } from '../components/ReportDisplay';
 import { SourceDataViewer } from '../components/SourceDataViewer';
+import { KPIDashboard } from '../components/kpi/KPIDashboard';
 import { analyzeDrugSafety } from '../services/geminiService';
+import { calculateKPIs } from '../utils/kpiCalculations';
 import type { AnalysisResult, SourceData } from '../types';
 import { BookmarkIcon } from '../components/icons/BookmarkIcon';
 import { DownloadIcon } from '../components/icons/DownloadIcon';
@@ -12,11 +14,7 @@ import html2canvas from 'html2canvas';
 
 type View = 'report' | 'sources';
 
-interface DashboardPageProps {
-  onViewPrivacy?: () => void;
-}
-
-export const DashboardPage: React.FC<DashboardPageProps> = ({ onViewPrivacy }) => {
+export const DashboardPage: React.FC = () => {
   const [drugName, setDrugName] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [analysisLog, setAnalysisLog] = useState<string[]>([]);
@@ -25,6 +23,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onViewPrivacy }) =
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>('report');
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const kpis = useMemo(() => {
+    if (analysisResult && sourceData) {
+      return calculateKPIs(analysisResult, sourceData);
+    }
+    return null;
+  }, [analysisResult, sourceData]);
 
   const handleAnalyze = async (newDrugName: string) => {
     setIsLoading(true);
@@ -89,8 +94,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onViewPrivacy }) =
         </div>
       )}
 
-      {analysisResult && sourceData && !isLoading && (
+      {analysisResult && sourceData && !isLoading && kpis && (
         <>
+          <KPIDashboard kpis={kpis} drugName={drugName} />
+
           <div className="flex justify-center items-center gap-4 mt-8">
               <div className="flex rounded-md shadow-sm bg-gray-800 border border-gray-700">
                   <button 
@@ -118,7 +125,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onViewPrivacy }) =
           
           <div ref={reportRef}>
             <div data-view="report" style={{ display: currentView === 'report' ? 'block' : 'none' }}>
-              <ReportDisplay result={analysisResult} drugName={drugName} onViewPrivacy={onViewPrivacy} />
+              <ReportDisplay result={analysisResult} drugName={drugName} />
             </div>
             <div data-view="sources" style={{ display: currentView === 'sources' ? 'block' : 'none' }}>
               <SourceDataViewer sourceData={sourceData} drugName={drugName} />
