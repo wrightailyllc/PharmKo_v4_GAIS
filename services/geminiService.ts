@@ -493,7 +493,12 @@ export const analyzeDrugSafety = async (
   updateLog('✓ AI analysis complete.');
 
   const jsonText = (geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
-  const aiResult = JSON.parse(jsonText);
+  let aiResult;
+  try {
+    aiResult = JSON.parse(jsonText);
+  } catch {
+    throw new Error('Failed to parse AI analysis response. Please try again.');
+  }
   
   // Calculate the harm score programmatically using the weighted scoring system
   updateLog('Calculating harm score...');

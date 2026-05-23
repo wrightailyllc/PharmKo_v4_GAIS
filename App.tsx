@@ -51,7 +51,6 @@ const App: React.FC = () => {
           google_oauth: data.google_oauth_configured,
           facebook_oauth: data.facebook_oauth_configured,
           database_ready: data.database_ready,
-          facebook_app_id: data.facebook_app_id
         });
 
         if (!data.auth_enabled && !storedToken) {
@@ -197,7 +196,7 @@ const App: React.FC = () => {
         onClose={() => setShowAuthModal(false)}
         onLoginSuccess={handleLoginSuccess}
         backendUrl={BACKEND_URL}
-        facebookAppId={authConfig?.facebook_app_id}
+        facebookOAuthConfigured={authConfig?.facebook_oauth ?? false}
       />
 
       {showProfileForm && user && sessionToken && (

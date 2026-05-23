@@ -6,12 +6,12 @@ interface AuthModalProps {
   onClose: () => void;
   onLoginSuccess: (user: any, token: string) => void;
   backendUrl: string;
-  facebookAppId?: string;
+  facebookOAuthConfigured: boolean;
 }
 
 type AuthMode = 'login' | 'register';
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, backendUrl, facebookAppId }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, backendUrl, facebookOAuthConfigured }) => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,8 +43,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
       const url = `${backendUrl}${endpoint}`;
       
-      console.log('Auth request:', { backendUrl, endpoint, url, email });
-      
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,14 +72,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
   };
 
   const handleFacebookLogin = () => {
-    if (!facebookAppId) {
+    if (!facebookOAuthConfigured) {
       setError('Facebook login not configured');
       return;
     }
-    
     const redirectUri = `${window.location.origin}/auth/facebook/callback`;
-    const scope = 'email,public_profile';
-    window.location.href = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${facebookAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+    window.location.href = `${backendUrl}/api/auth/facebook?redirect_uri=${encodeURIComponent(redirectUri)}`;
   };
 
   return (
@@ -99,6 +95,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white transition-colors"
+            aria-label="Close login dialog"
+            type="button"
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -171,6 +169,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="you@example.com"
             />
@@ -186,6 +185,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="Min. 8 characters"
             />

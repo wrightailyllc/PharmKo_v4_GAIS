@@ -22,6 +22,7 @@ export const DashboardPage: React.FC = () => {
   const [sourceData, setSourceData] = useState<SourceData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>('report');
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
 
   const kpis = useMemo(() => {
@@ -78,11 +79,17 @@ export const DashboardPage: React.FC = () => {
   };
 
   const handleSaveReport = () => {
-    alert("Saving reports is a premium feature that will be available with a user account. Stay tuned!");
+    setSaveNotice("Saving reports is a premium feature coming soon. Stay tuned!");
+    setTimeout(() => setSaveNotice(null), 4000);
   };
 
   return (
     <>
+      {saveNotice && (
+        <div className="fixed top-4 right-4 z-50 bg-indigo-600 text-white px-4 py-3 rounded-lg shadow-lg animate-pulse">
+          {saveNotice}
+        </div>
+      )}
       <DrugInputForm onAnalyze={handleAnalyze} isLoading={isLoading} />
       
       {isLoading && <AnalysisProgress log={analysisLog} />}
@@ -114,10 +121,10 @@ export const DashboardPage: React.FC = () => {
                   </button>
               </div>
               <div className="flex gap-2">
-                  <button onClick={handleDownloadPdf} className="p-2 bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors" title="Download Report">
+                  <button onClick={handleDownloadPdf} className="p-2 bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors" title="Download Report" aria-label="Download report as PDF" type="button">
                       <DownloadIcon className="h-5 w-5"/>
                   </button>
-                  <button onClick={handleSaveReport} className="p-2 bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors" title="Save Report (Premium)">
+                  <button onClick={handleSaveReport} className="p-2 bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors" title="Save Report (Premium)" aria-label="Save report" type="button">
                       <BookmarkIcon className="h-5 w-5"/>
                   </button>
               </div>

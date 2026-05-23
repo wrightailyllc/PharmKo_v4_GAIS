@@ -45,52 +45,62 @@ gcloud services enable iam.googleapis.com 2>/dev/null || true
 echo -e "${GREEN}✓ APIs enabled${NC}"
 echo ""
 
-# Step 3: Get API keys
-echo -e "${YELLOW}Step 3: Enter Your API Keys${NC}"
-read -sp "Enter your Gemini API Key (will be hidden): " GEMINI_KEY
-echo ""
-read -sp "Enter your FDA API Key (will be hidden): " FDA_KEY
+# Step 3: Get all secret values
+echo -e "${YELLOW}Step 3: Enter Your API Keys and Secrets${NC}"
+echo "All 9 secrets required by cloudbuild.yaml will be created."
 echo ""
 
-if [ -z "$GEMINI_KEY" ] || [ -z "$FDA_KEY" ]; then
-    echo -e "${RED}Error: Both API keys are required${NC}"
+read -sp "Gemini API Key (hidden): " GEMINI_KEY; echo ""
+read -sp "FDA API Key (hidden): " FDA_KEY; echo ""
+read -sp "Google OAuth Client ID (hidden): " GOOGLE_OAUTH_CLIENT_ID; echo ""
+read -sp "Google OAuth Client Secret (hidden): " GOOGLE_OAUTH_CLIENT_SECRET; echo ""
+read -sp "Facebook App ID (hidden): " FACEBOOK_APP_ID; echo ""
+read -sp "Facebook App Secret (hidden): " FACEBOOK_APP_SECRET; echo ""
+read -sp "Cloud SQL Password (hidden): " CLOUD_SQL_PASSWORD; echo ""
+read -p  "GCS Bucket Name: " GCS_BUCKET_NAME
+read -p  "PharmKo Admin Email: " PHARMKO_ADMIN_EMAIL
+
+if [ -z "$GEMINI_KEY" ] || [ -z "$FDA_KEY" ] || [ -z "$GOOGLE_OAUTH_CLIENT_ID" ] || \
+   [ -z "$GOOGLE_OAUTH_CLIENT_SECRET" ] || [ -z "$FACEBOOK_APP_ID" ] || \
+   [ -z "$FACEBOOK_APP_SECRET" ] || [ -z "$CLOUD_SQL_PASSWORD" ] || \
+   [ -z "$GCS_BUCKET_NAME" ] || [ -z "$PHARMKO_ADMIN_EMAIL" ]; then
+    echo -e "${RED}Error: All 9 secrets are required${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✓ API keys received${NC}"
+echo -e "${GREEN}✓ Secrets received${NC}"
 echo ""
 
-# Step 4: Create secrets
+# Step 4: Create / update all 9 secrets in Secret Manager
 echo -e "${YELLOW}Step 4: Creating Secrets in Secret Manager${NC}"
 
-# Check if secrets exist
-if gcloud secrets describe gemini-api-key --project=$PROJECT_ID &>/dev/null; then
-    echo "Updating existing gemini-api-key..."
-    echo -n "$GEMINI_KEY" | gcloud secrets versions add gemini-api-key \
-        --data-file=- \
-        --project=$PROJECT_ID
-else
-    echo "Creating new gemini-api-key..."
-    echo -n "$GEMINI_KEY" | gcloud secrets create gemini-api-key \
-        --data-file=- \
-        --project=$PROJECT_ID \
-        --replication-policy="automatic"
-fi
+# Helper: create-or-update a secret
+upsert_secret() {
+    local NAME="$1"
+    local VALUE="$2"
+    if gcloud secrets describe "$NAME" --project=$PROJECT_ID &>/dev/null; then
+        echo "Updating existing $NAME..."
+        echo -n "$VALUE" | gcloud secrets versions add "$NAME" --data-file=- --project=$PROJECT_ID
+    else
+        echo "Creating new $NAME..."
+        echo -n "$VALUE" | gcloud secrets create "$NAME" \
+            --data-file=- \
+            --project=$PROJECT_ID \
+            --replication-policy="automatic"
+    fi
+}
 
-if gcloud secrets describe fda-api-key --project=$PROJECT_ID &>/dev/null; then
-    echo "Updating existing fda-api-key..."
-    echo -n "$FDA_KEY" | gcloud secrets versions add fda-api-key \
-        --data-file=- \
-        --project=$PROJECT_ID
-else
-    echo "Creating new fda-api-key..."
-    echo -n "$FDA_KEY" | gcloud secrets create fda-api-key \
-        --data-file=- \
-        --project=$PROJECT_ID \
-        --replication-policy="automatic"
-fi
+upsert_secret "gemini-api-key"            "$GEMINI_KEY"
+upsert_secret "fda-api-key"               "$FDA_KEY"
+upsert_secret "google-oauth-client-id"    "$GOOGLE_OAUTH_CLIENT_ID"
+upsert_secret "google-oauth-client-secret" "$GOOGLE_OAUTH_CLIENT_SECRET"
+upsert_secret "facebook-app-id"           "$FACEBOOK_APP_ID"
+upsert_secret "facebook-app-secret"       "$FACEBOOK_APP_SECRET"
+upsert_secret "cloud-sql-password"        "$CLOUD_SQL_PASSWORD"
+upsert_secret "gcs-bucket-name"           "$GCS_BUCKET_NAME"
+upsert_secret "pharmko-admin-email"       "$PHARMKO_ADMIN_EMAIL"
 
-echo -e "${GREEN}✓ Secrets created${NC}"
+echo -e "${GREEN}✓ All 9 secrets created/updated${NC}"
 echo ""
 
 # Step 5: Grant permissions
@@ -98,33 +108,36 @@ echo -e "${YELLOW}Step 5: Granting Service Account Permissions${NC}"
 
 export SA_EMAIL="${PROJECT_ID}@appspot.gserviceaccount.com"
 
-gcloud secrets add-iam-policy-binding gemini-api-key \
-  --member=serviceAccount:$SA_EMAIL \
-  --role=roles/secretmanager.secretAccessor \
-  --project=$PROJECT_ID &>/dev/null
+ALL_SECRETS=(
+    gemini-api-key fda-api-key google-oauth-client-id google-oauth-client-secret
+    facebook-app-id facebook-app-secret cloud-sql-password gcs-bucket-name pharmko-admin-email
+)
 
-gcloud secrets add-iam-policy-binding fda-api-key \
-  --member=serviceAccount:$SA_EMAIL \
-  --role=roles/secretmanager.secretAccessor \
-  --project=$PROJECT_ID &>/dev/null
+for SECRET in "${ALL_SECRETS[@]}"; do
+    gcloud secrets add-iam-policy-binding "$SECRET" \
+      --member=serviceAccount:$SA_EMAIL \
+      --role=roles/secretmanager.secretAccessor \
+      --project=$PROJECT_ID &>/dev/null
+done
 
 echo -e "${GREEN}✓ Permissions granted to service account${NC}"
 echo ""
 
-# Step 6: Verify secrets
+# Step 6: Verify all secrets
 echo -e "${YELLOW}Step 6: Verifying Secrets${NC}"
 
-if gcloud secrets describe gemini-api-key --project=$PROJECT_ID &>/dev/null; then
-    echo -e "${GREEN}✓ gemini-api-key exists${NC}"
-else
-    echo -e "${RED}✗ gemini-api-key not found${NC}"
-    exit 1
-fi
+MISSING=0
+for SECRET in "${ALL_SECRETS[@]}"; do
+    if gcloud secrets describe "$SECRET" --project=$PROJECT_ID &>/dev/null; then
+        echo -e "${GREEN}✓ $SECRET exists${NC}"
+    else
+        echo -e "${RED}✗ $SECRET not found${NC}"
+        MISSING=1
+    fi
+done
 
-if gcloud secrets describe fda-api-key --project=$PROJECT_ID &>/dev/null; then
-    echo -e "${GREEN}✓ fda-api-key exists${NC}"
-else
-    echo -e "${RED}✗ fda-api-key not found${NC}"
+if [ "$MISSING" -eq 1 ]; then
+    echo -e "${RED}Error: One or more secrets are missing. Aborting.${NC}"
     exit 1
 fi
 

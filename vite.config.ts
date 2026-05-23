@@ -13,12 +13,12 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
           navigateFallback: '/index.html',
-          // Don't cache API responses - drug data should be fresh
+          navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [
             {
-              urlPattern: /^https:\/\/pharmko\.app\/api\//,
+              urlPattern: /\/api\//,
               handler: 'NetworkOnly',
             },
           ],
@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => {
       hmr: false,
       proxy: {
         '/api': {
-          target: 'http://localhost:8000',
+          target: 'http://localhost:5000',
           changeOrigin: true,
         },
       },

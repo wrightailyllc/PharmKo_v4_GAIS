@@ -14,10 +14,10 @@
  * BACKEND_BASE_URL resolution:
  * - Native app (Capacitor): always use absolute Cloud Run URL
  * - Web prod (same-origin Cloud Run): empty string → relative paths
- * - Web dev (vite): override via VITE_BACKEND_URL env var, fall back to localhost:8000
+ * - Web dev (vite): override via VITE_BACKEND_URL env var, fall back to localhost:5000
  */
 
-const PRODUCTION_BACKEND = 'https://pharmko-app-ujgphtntsq-uc.a.run.app';
+const PRODUCTION_BACKEND = (import.meta.env.VITE_PRODUCTION_BACKEND as string | undefined) || 'https://pharmko-app-ujgphtntsq-uc.a.run.app';
 
 const isNativePlatform = (): boolean => {
   if (typeof window === 'undefined') return false;
@@ -38,9 +38,9 @@ export const getBackendBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
     const override = import.meta.env.VITE_BACKEND_URL as string | undefined;
     if (override) return override;
-    return `${window.location.protocol}//${window.location.hostname}:8000`;
+    return `${window.location.protocol}//${window.location.hostname}:5000`;
   }
-  return 'http://localhost:8000';
+  return 'http://localhost:5000';
 };
 
 export const BACKEND_BASE_URL = getBackendBaseUrl();

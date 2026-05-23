@@ -49,15 +49,19 @@ steps:
       # redeploy and never lives as a literal string in source control.
       - 'GEMINI_API_KEY=gemini-api-key:latest,FDA_API_KEY=fda-api-key:latest,GOOGLE_OAUTH_CLIENT_ID=google-oauth-client-id:latest,GOOGLE_OAUTH_CLIENT_SECRET=google-oauth-client-secret:latest,FACEBOOK_APP_ID=facebook-app-id:latest,FACEBOOK_APP_SECRET=facebook-app-secret:latest,CLOUD_SQL_PASSWORD=cloud-sql-password:latest,GCS_BUCKET_NAME=gcs-bucket-name:latest,ADMIN_EMAIL=pharmko-admin-email:latest'
       - '--set-env-vars'
-      - 'CLOUD_SQL_INSTANCE=$PROJECT_ID:us-central1:pharmko-db,CLOUD_SQL_USER=pharmko,CLOUD_SQL_DATABASE=pharmko,CLOUD_SQL_TYPE=postgresql,AUTH_ENABLED=true,ALLOWED_ORIGINS=https://pharmko-app-460663669978.us-central1.run.app'
+      - 'CLOUD_SQL_INSTANCE=$PROJECT_ID:us-central1:pharmko-db,CLOUD_SQL_USER=pharmko,CLOUD_SQL_DATABASE=pharmko,CLOUD_SQL_TYPE=postgresql,AUTH_ENABLED=true,ALLOWED_ORIGINS=$_ALLOWED_ORIGINS'
       - '--memory'
       - '512Mi'
       - '--timeout'
       - '300'
       - '--min-instances'
-      - '0'
+      - '1'
       - '--max-instances'
       - '10'
+
+substitutions:
+  # Override with --substitutions _ALLOWED_ORIGINS=https://your-url.run.app at build time
+  _ALLOWED_ORIGINS: https://pharmko-app-460663669978.us-central1.run.app
 
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -19,7 +19,6 @@ export interface AuthConfig {
   google_oauth: boolean;
   facebook_oauth: boolean;
   database_ready: boolean;
-  facebook_app_id?: string;
 }
 
 export interface AuthState {

@@ -523,8 +523,8 @@ class AuthService:
                 "prompt": "consent"
             }
             
-            query_string = "&".join(f"{k}={v}" for k, v in params.items())
-            return f"{auth_endpoint}?{query_string}"
+            from urllib.parse import urlencode
+            return f"{auth_endpoint}?{urlencode(params)}"
         except Exception as e:
             logger.error(f"Failed to generate Google auth URL: {e}")
             return None

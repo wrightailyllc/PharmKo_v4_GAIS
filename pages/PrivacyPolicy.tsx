@@ -137,7 +137,7 @@ export const PrivacyPolicy: React.FC = () => {
             <div className="bg-gray-800 p-4 rounded-md">
               <p className="text-gray-300"><strong>WrightAI, LLC. (PharmKo)</strong></p>
               <p className="text-gray-300">Email: privacy@pharmko.app</p>
-              <p className="text-gray-300 text-sm mt-4">This privacy policy was last updated on November 28, 2025.</p>
+              <p className="text-gray-300 text-sm mt-4">This privacy policy was last updated on May 23, 2026.</p>
             </div>
           </section>
         </article>

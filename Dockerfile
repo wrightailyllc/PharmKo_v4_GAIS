@@ -18,6 +18,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Copy Python requirements and install dependencies
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
@@ -35,6 +38,13 @@ EXPOSE 8080
 # Set environment variables
 ENV FLASK_APP=main.py
 ENV PORT=8080
+
+# Create non-root user for security
+RUN addgroup --system pharmko && adduser --system --ingroup pharmko pharmko
+USER pharmko
+
+# Health check so Cloud Run and orchestrators know when the container is ready
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:8080/api/health || exit 1
 
 # Run the Flask app with gunicorn (2 workers, 300s timeout for long API calls)
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "300", "main:app"]

@@ -13,7 +13,7 @@ COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the backend code
-COPY backend/main.py ./
+COPY backend/main.py backend/auth_service.py backend/gcloud_services.py ./
 
 # Expose port 5000
 EXPOSE 5000
@@ -22,5 +22,5 @@ EXPOSE 5000
 ENV FLASK_APP=main.py
 ENV PORT=5000
 
-# Run Flask
-CMD ["python", "main.py"]
+# Run with gunicorn for production robustness
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "300", "main:app"]

@@ -7,16 +7,30 @@ import logging
 import atexit
 from pathlib import Path
 from functools import wraps
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, redirect as flask_redirect
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder=None)
-ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5000,http://localhost:5173").split(",")
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB max request body
+
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "").split(",")
+ALLOWED_ORIGINS = [o.strip() for o in ALLOWED_ORIGINS if o.strip()]
+if not ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS = ["http://localhost:5000", "http://localhost:5173"]
 CORS(app, supports_credentials=True, origins=ALLOWED_ORIGINS)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per hour"],
+    storage_uri="memory://",
+)
 
 # Import Google Cloud services (optional - only if configured)
 try:
@@ -147,8 +161,17 @@ def get_secret(secret_name: str) -> str:
         raise ValueError(f"Secret '{secret_name}' not found in environment variables")
     
     _secrets_cache[secret_name] = secret_value
-    logger.info(f"Retrieved secret: {secret_name}")
+    logger.debug(f"Retrieved secret: {secret_name}")
     return secret_value
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    return response
 
 
 # API Routes
@@ -176,6 +199,8 @@ def _safe_proxy_log(label: str, exc: Exception) -> None:
 
 
 @app.route("/api/proxy/analyze", methods=["POST"])
+@require_auth
+@limiter.limit("20 per hour")
 def proxy_gemini_analyze():
     """Proxy Gemini API calls — injects API key server-side so it never reaches the browser.
     The API key is sent in the x-goog-api-key header, never in the URL, so it cannot
@@ -219,6 +244,8 @@ def proxy_gemini_analyze():
 
 
 @app.route("/api/proxy/fda/<path:fda_path>", methods=["GET"])
+@require_auth
+@limiter.limit("60 per hour")
 def proxy_fda(fda_path):
     """Proxy FDA API calls — injects API key server-side so it never reaches the browser.
     The API key is sent in the Authorization-style query param required by openFDA, but
@@ -292,13 +319,11 @@ def get_config():
 @app.route("/api/auth/status", methods=["GET"])
 def auth_status():
     """Check authentication status and configuration"""
-    facebook_app_id = os.environ.get("FACEBOOK_APP_ID")
     return jsonify({
         "auth_enabled": AUTH_ENABLED,
         "google_oauth_configured": bool(os.environ.get("GOOGLE_OAUTH_CLIENT_ID")),
-        "facebook_oauth_configured": bool(facebook_app_id),
+        "facebook_oauth_configured": bool(os.environ.get("FACEBOOK_APP_ID")),
         "database_ready": is_gcloud_sql_available(),
-        "facebook_app_id": facebook_app_id
     }), 200
 
 
@@ -318,10 +343,12 @@ def toggle_auth():
             "auth_enabled": AUTH_ENABLED
         }), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Toggle auth error: {e}")
+        return jsonify({"error": "Failed to toggle authentication"}), 500
 
 
 @app.route("/api/auth/register", methods=["POST"])
+@limiter.limit("5 per hour")
 def register():
     """Register new user with email/password"""
     if not AUTH_SERVICE:
@@ -342,10 +369,11 @@ def register():
         return jsonify(result), 400
     except Exception as e:
         logger.error(f"Registration error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Registration failed. Please try again."}), 500
 
 
 @app.route("/api/auth/login", methods=["POST"])
+@limiter.limit("10 per minute")
 def login():
     """Login with email/password"""
     if not AUTH_SERVICE:
@@ -365,7 +393,7 @@ def login():
         return jsonify(result), 401
     except Exception as e:
         logger.error(f"Login error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Login failed. Please try again."}), 500
 
 
 @app.route("/api/auth/google", methods=["GET"])
@@ -382,7 +410,7 @@ def google_auth():
     
     auth_url = AUTH_SERVICE.get_google_auth_url(redirect_uri)
     if auth_url:
-        return jsonify({"auth_url": auth_url}), 200
+        return flask_redirect(auth_url)
     return jsonify({"error": "Google OAuth not configured"}), 503
 
 
@@ -406,7 +434,30 @@ def google_callback():
         return jsonify(result), 401
     except Exception as e:
         logger.error(f"Google callback error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Google authentication failed"}), 500
+
+
+@app.route("/api/auth/facebook", methods=["GET"])
+def facebook_auth():
+    """Get Facebook OAuth authorization URL"""
+    facebook_app_id = os.environ.get("FACEBOOK_APP_ID")
+    if not facebook_app_id:
+        return jsonify({"error": "Facebook OAuth not configured"}), 503
+
+    redirect_uri = request.args.get("redirect_uri")
+    if not redirect_uri:
+        scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
+        redirect_uri = f"{scheme}://{request.host}/auth/facebook/callback"
+
+    from urllib.parse import urlencode
+    params = urlencode({
+        "client_id": facebook_app_id,
+        "redirect_uri": redirect_uri,
+        "scope": "email,public_profile",
+        "response_type": "code",
+    })
+    auth_url = f"https://www.facebook.com/v18.0/dialog/oauth?{params}"
+    return flask_redirect(auth_url)
 
 
 @app.route("/api/auth/facebook/callback", methods=["POST"])
@@ -440,8 +491,8 @@ def facebook_callback():
             "code": code,
             "redirect_uri": redirect_uri
         }
-        
-        token_response = http_requests.get(token_url, params=token_params)
+
+        token_response = http_requests.post(token_url, data=token_params)
         token_data = token_response.json()
         
         if "error" in token_data:
@@ -459,7 +510,7 @@ def facebook_callback():
         return jsonify(result), 401
     except Exception as e:
         logger.error(f"Facebook callback error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Facebook authentication failed"}), 500
 
 
 @app.route("/api/auth/logout", methods=["POST"])
@@ -503,7 +554,7 @@ def update_profile():
         return jsonify(result), 400
     except Exception as e:
         logger.error(f"Profile update error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Profile update failed"}), 500
 
 
 @app.route("/api/auth/users", methods=["GET"])
@@ -518,6 +569,7 @@ def list_users():
 
 
 @app.route("/api/analysis/cached", methods=["POST"])
+@require_auth
 def analyze_with_cache():
     """
     Analyze drug with intelligent query caching.
@@ -554,11 +606,12 @@ def analyze_with_cache():
         }), 200
     
     except Exception as e:
-        logger.error(f"Cache analysis error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Cache analysis error: {e}")
+        return jsonify({"error": "Cache lookup failed"}), 500
 
 
 @app.route("/api/analysis/save-cache", methods=["POST"])
+@require_auth
 def save_analysis_cache():
     """
     Save analysis results to cache.
@@ -602,8 +655,8 @@ def save_analysis_cache():
         }), 200
     
     except Exception as e:
-        logger.error(f"Cache save error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Cache save error: {e}")
+        return jsonify({"error": "Failed to save cache"}), 500
 
 
 # ============================================================
@@ -611,6 +664,7 @@ def save_analysis_cache():
 # ============================================================
 
 @app.route("/api/gcloud/storage/upload", methods=["POST"])
+@require_auth
 def gcloud_upload():
     """Upload a file to Google Cloud Storage"""
     if not is_gcloud_storage_available():
@@ -625,6 +679,8 @@ def gcloud_upload():
             return jsonify({"error": "No file selected"}), 400
         
         destination = request.form.get('destination', file.filename)
+        if '..' in destination or destination.startswith('/'):
+            return jsonify({"error": "Invalid destination path"}), 400
         make_public = request.form.get('make_public', 'false').lower() == 'true'
         
         import tempfile
@@ -644,10 +700,11 @@ def gcloud_upload():
         }), 200
     except Exception as e:
         logger.error(f"GCS upload error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "File upload failed"}), 500
 
 
 @app.route("/api/gcloud/storage/list", methods=["GET"])
+@require_auth
 def gcloud_list_files():
     """List files in Google Cloud Storage bucket"""
     if not is_gcloud_storage_available():
@@ -665,10 +722,11 @@ def gcloud_list_files():
         }), 200
     except Exception as e:
         logger.error(f"GCS list error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to list files"}), 500
 
 
 @app.route("/api/gcloud/storage/delete", methods=["DELETE"])
+@require_admin
 def gcloud_delete_file():
     """Delete a file from Google Cloud Storage"""
     if not is_gcloud_storage_available():
@@ -686,10 +744,11 @@ def gcloud_delete_file():
         }), 200
     except Exception as e:
         logger.error(f"GCS delete error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to delete file"}), 500
 
 
 @app.route("/api/gcloud/storage/signed-url", methods=["GET"])
+@require_auth
 def gcloud_signed_url():
     """Generate a signed URL for temporary file access"""
     if not is_gcloud_storage_available():
@@ -711,7 +770,7 @@ def gcloud_signed_url():
         }), 200
     except Exception as e:
         logger.error(f"GCS signed URL error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to generate signed URL"}), 500
 
 
 # ============================================================
@@ -719,6 +778,7 @@ def gcloud_signed_url():
 # ============================================================
 
 @app.route("/api/gcloud/sql/test", methods=["GET"])
+@require_admin
 def gcloud_sql_test():
     """Test Cloud SQL connection"""
     if not is_gcloud_sql_available():
@@ -729,7 +789,7 @@ def gcloud_sql_test():
         return jsonify(result), 200 if result.get("connected") else 500
     except Exception as e:
         logger.error(f"Cloud SQL test error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Cloud SQL connection test failed"}), 500
 
 
 @app.route("/api/gcloud/sql/query", methods=["POST"])
@@ -763,7 +823,7 @@ def gcloud_sql_query():
         }), 200
     except Exception as e:
         logger.error(f"Cloud SQL query error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Query execution failed"}), 500
 
 
 # Static file serving - serve React app
