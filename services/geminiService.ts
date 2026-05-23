@@ -220,14 +220,23 @@ function calculateTotalHarmScore(
 
 // --- Helper Functions ---
 
+const getAuthHeaders = (): HeadersInit => {
+  const token = localStorage.getItem('pharmko_session_token');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
+const isInternalUrl = (url: string): boolean =>
+  url.startsWith('/') || url.startsWith(window.location.origin);
+
 const fetchApi = async (url: string, errorMessage: string) => {
   try {
-    const response = await fetch(url);
+    const headers = isInternalUrl(url) ? getAuthHeaders() : {};
+    const response = await fetch(url, { headers });
     if (!response.ok) {
       if (response.status === 404) {
-        return null; // Gracefully handle "Not Found" as no data
+        return null;
       }
-      throw new Error(`${errorMessage}: ${response.status} ${response.statusText}`);
+      throw new Error(`${errorMessage}: ${response.status}`);
     }
     return await response.json();
   } catch (error) {
@@ -476,7 +485,7 @@ export const analyzeDrugSafety = async (
   // Call Gemini via server-side proxy (keys injected on the backend)
   const proxyResponse = await fetch(config.apiEndpoints.geminiProxy, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({
       prompt: prompt,
       response_schema: analysisResultSchema,
