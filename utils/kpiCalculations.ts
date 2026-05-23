@@ -72,10 +72,9 @@ export function calculateSafetyTrend(
     clinicalTrialActivity = 'completed';
   }
 
-  // Check for black box warnings (indicator of worsening)
-  const hasBlackBox = result.drugLabelAnalysis.blackBoxWarning &&
-    result.drugLabelAnalysis.blackBoxWarning.toLowerCase() !== 'none' &&
-    result.drugLabelAnalysis.blackBoxWarning.toLowerCase() !== 'n/a';
+  // Use the scoring system's determination (based on raw FDA label data) rather than AI-generated text
+  const labelDetails = result.potentialHarmScore.scoreBreakdown?.labelWarnings?.details?.toLowerCase() ?? '';
+  const hasBlackBox = labelDetails.includes('black box warning present');
 
   // Determine direction based on available signals
   let direction: 'improving' | 'stable' | 'worsening' | 'unknown' = 'stable';

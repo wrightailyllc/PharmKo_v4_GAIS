@@ -276,7 +276,7 @@ const fetchFdaData = async (drugName: string, activeIngredient: string) => {
 
   // No api_key parameter needed -- the proxy injects it server-side
   const labelUrl = `${fdaProxyBase}/label.json?search=${labelSearchQuery}&limit=1`;
-  const totalEventsUrl = `${fdaProxyBase}/event.json?search=${eventSearchQuery}&count=safetyreportid.exact&limit=0`;
+  const totalEventsUrl = `${fdaProxyBase}/event.json?search=${eventSearchQuery}&limit=1`;
   const topReactionsUrl = `${fdaProxyBase}/event.json?search=${eventSearchQuery}&count=patient.reaction.reactionmeddrapt.exact&limit=50`;
 
   const [fdaLabel, adverseEventsTotal, adverseEventsReactions] = await Promise.all([
